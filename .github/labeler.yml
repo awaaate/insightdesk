@@ -1,0 +1,73 @@
+# Configuration for the PR Labeler action
+
+# Backend/API changes
+'backend':
+  - 'apps/radar/**/*'
+  - 'apps/server/**/*'
+
+# Frontend changes  
+'frontend':
+  - 'apps/web/**/*'
+
+# Analytics changes
+'analytics':
+  - 'apps/analytics/**/*'
+  - 'notebooks/**/*'
+  - 'v1dashboard/**/*'
+
+# Database changes
+'database':
+  - 'apps/radar/src/db/**/*'
+  - '**/*migration*'
+  - '**/*.sql'
+
+# Documentation changes
+'documentation':
+  - '*.md'
+  - 'docs/**/*'
+  - '.github/**/*'
+
+# Configuration changes
+'config':
+  - '*.json'
+  - '*.yml'
+  - '*.yaml'
+  - '*.toml'
+  - '.env*'
+  - 'turbo.json'
+  - 'tsconfig.json'
+  - 'package.json'
+  - 'bun.lock'
+
+# Dependencies
+'dependencies':
+  - 'package.json'
+  - 'bun.lock'
+  - 'yarn.lock'
+  - 'package-lock.json'
+
+# Tests
+'tests':
+  - '**/*.test.*'
+  - '**/*.spec.*'
+  - 'tests/**/*'
+
+# TypeScript changes
+'typescript':
+  - '**/*.ts'
+  - '**/*.tsx'
+  - 'tsconfig.json'
+
+# React/UI changes
+'ui':
+  - 'apps/web/src/components/**/*'
+  - 'apps/web/src/views/**/*'
+  - '**/*.css'
+
+# AI/ML related
+'ai':
+  - 'apps/radar/src/ai/**/*'
+  - '**/*prompt*'
+  - '**/*llm*'
+  - '**/*openai*'
+  - '**/*perplexity*'

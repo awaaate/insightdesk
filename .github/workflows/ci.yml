@@ -1,0 +1,119 @@
+name: 🔄 CI Pipeline
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+
+jobs:
+  lint-and-typecheck:
+    name: 🧹 Lint & Type Check
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📦 Checkout
+        uses: actions/checkout@v4
+        
+      - name: 🟢 Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+          
+      - name: 📥 Install dependencies
+        run: bun install
+        
+      - name: 🧹 Lint radar backend
+        run: |
+          cd apps/radar
+          bun run check-types
+          
+      - name: 🧹 Lint web dashboard  
+        run: |
+          cd apps/web
+          bun run check-types
+          
+      - name: 🧹 Lint analytics server
+        run: |
+          cd apps/server
+          bun run check-types
+
+  build:
+    name: 🏗️ Build
+    runs-on: ubuntu-latest
+    needs: lint-and-typecheck
+    
+    steps:
+      - name: 📦 Checkout
+        uses: actions/checkout@v4
+        
+      - name: 🟢 Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+          
+      - name: 📥 Install dependencies
+        run: bun install
+        
+      - name: 🏗️ Build radar backend
+        run: |
+          cd apps/radar
+          bun run build
+          
+      - name: 🏗️ Build web dashboard
+        run: |
+          cd apps/web
+          bun run build
+          
+      - name: 🏗️ Build analytics server
+        run: |
+          cd apps/server
+          bun run build
+
+  # Uncomment when tests are implemented
+  # test:
+  #   name: 🧪 Test
+  #   runs-on: ubuntu-latest
+  #   needs: lint-and-typecheck
+    
+  #   services:
+  #     postgres:
+  #       image: postgres:15
+  #       env:
+  #         POSTGRES_PASSWORD: postgres
+  #         POSTGRES_DB: georadar_test
+  #       options: >-
+  #         --health-cmd pg_isready
+  #         --health-interval 10s
+  #         --health-timeout 5s
+  #         --health-retries 5
+  #       ports:
+  #         - 5432:5432
+          
+  #     redis:
+  #       image: redis:7
+  #       options: >-
+  #         --health-cmd "redis-cli ping"
+  #         --health-interval 10s
+  #         --health-timeout 5s
+  #         --health-retries 5
+  #       ports:
+  #         - 6379:6379
+    
+  #   steps:
+  #     - name: 📦 Checkout
+  #       uses: actions/checkout@v4
+        
+  #     - name: 🟢 Setup Bun
+  #       uses: oven-sh/setup-bun@v1
+  #       with:
+  #         bun-version: latest
+          
+  #     - name: 📥 Install dependencies
+  #       run: bun install
+        
+  #     - name: 🧪 Run tests
+  #       run: bun test
+  #       env:
+  #         DATABASE_URL: postgresql://postgres:postgres@localhost:5432/georadar_test
+  #         REDIS_URL: redis://localhost:6379
