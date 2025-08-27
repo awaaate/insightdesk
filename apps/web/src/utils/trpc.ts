@@ -1,8 +1,4 @@
-import type {
-  AppRouter,
-  RouterInput,
-  RouterOutput,
-} from "../../../server/src/routers";
+import type { AppRouter } from "../../../server/src/routers";
 import { QueryCache, QueryClient } from "@tanstack/react-query";
 import { createTRPCClient, httpBatchLink } from "@trpc/client";
 import { createTRPCOptionsProxy } from "@trpc/tanstack-react-query";
@@ -39,5 +35,3 @@ export const trpc = createTRPCOptionsProxy<AppRouter>({
   client: trpcClient,
   queryClient,
 });
-
-export type { AppRouter, RouterInput, RouterOutput };

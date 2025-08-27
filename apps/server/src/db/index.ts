@@ -17,6 +17,11 @@ export namespace DB {
     export type Select = SchemaTypes.Comment;
   }
 
+  export namespace SentimentLevel {
+    export type Insert = SchemaTypes.NewSentimentLevel;
+    export type Select = SchemaTypes.SentimentLevel;
+  }
+
   const connectionPool = new Pool({
     connectionString: process.env.DATABASE_URL,
   });

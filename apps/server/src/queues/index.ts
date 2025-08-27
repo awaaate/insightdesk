@@ -6,32 +6,15 @@ import { visualLogger } from "@/lib/visualLogger";
 import { Queue, Worker, type Processor, type WorkerOptions } from "bullmq";
 import IORedis from "ioredis";
 import { z } from "zod";
-
+import { AnalyzeComments as AC } from "./workers";
+import { Names as N } from "./names";
 export namespace Queues {
+  export import AnalyzeComments = AC;
+  export import Names = N;
   export const connection = new IORedis(Env.config.REDIS_URL, {
     maxRetriesPerRequest: null,
   });
 
-  export enum Names {
-    CATEGORIZE_COMMENT = "categorize-comment-batch",
-  }
-
-  export const CategorizeCommentJobData = z.object({
-    commentIds: z.array(z.string()),
-  });
-
-  export type CategorizeCommentJobData = z.infer<
-    typeof CategorizeCommentJobData
-  >;
-
-  export const GenerateInsightsJobData = z.object({
-    commentIds: z.array(z.string()),
-  });
-
-  export type JobData = {
-    type: Queues.Names.CATEGORIZE_COMMENT;
-    data: CategorizeCommentJobData;
-  };
   export const JobCompletedEvent = Bus.event(
     "job.completed",
     z.object({
@@ -69,11 +52,7 @@ export namespace Queues {
     createQueue<T = any>(name: Names) {
       return new Queue<T, boolean>(name, { connection: Queues.connection });
     },
-    createWorker<
-      Type extends Names,
-      TData extends Extract<JobData, { type: Type }>["data"],
-      R = unknown
-    >(
+    createWorker<Type extends Names, TData extends unknown, R = unknown>(
       name: Type,
       processor: Processor<TData, R>,
       opts?: Partial<WorkerOptions>
@@ -108,15 +87,15 @@ export namespace Queues {
         } catch (error) {
           // Verificar si el error ya fue procesado por el worker
           const hasWorkerErrorResult = (error as any)?.workerErrorResult;
-          
+
           if (hasWorkerErrorResult) {
             // El error ya fue procesado por el worker, usar esa información
             const errorResult = (error as any).workerErrorResult;
-            
+
             // Crear error para Bull Dashboard
             const bullError = new Error(errorResult.summary);
             bullError.name = errorResult.error.name;
-            
+
             // Hacer el error serializable para Bull Dashboard
             Object.defineProperty(bullError, "toJSON", {
               value: () => ({
@@ -126,11 +105,11 @@ export namespace Queues {
                 context: errorResult.context,
                 timestamp: errorResult.timestamp,
                 duration: errorResult.duration,
-                jobId: errorResult.jobId
+                jobId: errorResult.jobId,
               }),
               enumerable: false,
             });
-            
+
             // Log el error formateado
             logger.error(
               {
@@ -141,10 +120,10 @@ export namespace Queues {
               },
               `Job failed in queue ${name}: ${errorResult.summary}`
             );
-            
+
             throw bullError;
           }
-          
+
           // Si el error no fue procesado, procesarlo aquí (fallback)
           const rootCause = (error as any)?.cause || error;
           const errorChain: any[] = [];
@@ -166,20 +145,24 @@ export namespace Queues {
                 currentError instanceof NamedError
                   ? currentError.toObject()
                   : undefined,
-              source: currentError instanceof Error ? currentError.constructor.name : typeof currentError,
-              timestamp: new Date().toISOString()
+              source:
+                currentError instanceof Error
+                  ? currentError.constructor.name
+                  : typeof currentError,
+              timestamp: new Date().toISOString(),
             });
             currentError = (currentError as any)?.cause;
           }
 
-          const errorSummary = errorChain.length > 1 
-            ? `${errorChain[0].name}: ${errorChain[0].message} (caused by ${errorChain[errorChain.length - 1].name})`
-            : `${errorChain[0]?.name || "Error"}: ${errorChain[0]?.message || "Unknown error"}`;
+          const errorSummary =
+            errorChain.length > 1
+              ? `${errorChain[0].name}: ${errorChain[0].message} (caused by ${errorChain[errorChain.length - 1].name})`
+              : `${errorChain[0]?.name || "Error"}: ${errorChain[0]?.message || "Unknown error"}`;
 
           // Crear error para Bull Dashboard
           const bullError = new Error(errorSummary);
           bullError.name = error instanceof Error ? error.name : "UnknownError";
-          
+
           // Hacer el error serializable para Bull Dashboard
           const errorData = {
             name: bullError.name,
@@ -193,9 +176,9 @@ export namespace Queues {
             },
             timestamp: new Date().toISOString(),
             duration: Date.now() - startTime,
-            jobId
+            jobId,
           };
-          
+
           Object.defineProperty(bullError, "toJSON", {
             value: () => errorData,
             enumerable: false,
@@ -296,8 +279,8 @@ export namespace Queues {
   };
 
   export const queues = {
-    [Names.CATEGORIZE_COMMENT]: create.createQueue<CategorizeCommentJobData>(
-      Names.CATEGORIZE_COMMENT
+    [Names.ANALYZE_COMMENTS_BATCH]: create.createQueue<unknown>(
+      Names.ANALYZE_COMMENTS_BATCH
     ),
   };
 }

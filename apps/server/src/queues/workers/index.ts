@@ -1,1 +1,1 @@
-export * from "./commentCategorization";
+export * from "./analyze-comments";

@@ -6,7 +6,9 @@ import { NamedError } from "@/error";
 
 export namespace PromptTemplates {
   export enum TemplateName {
-    INSIGHT_CATEGORIZATION = "insight-categorization",
+    INSIGHT_DETECTION = "insight-detection",
+    INTENTION_DETECTION = "intention-detection",
+    SENTIMENT_ANALYSIS = "sentiment-analysis",
   }
 
   // Cache for compiled templates
@@ -35,26 +37,78 @@ export namespace PromptTemplates {
     return compiledTemplate;
   }
 
-  export const INSIGHT_CATEGORIZATION = {
+  export const INSIGHT_DETECTION = {
     version: 1,
     schema: z.object({
       insights: z.array(z.string()).describe("List of existing insights"),
-      comments: z.array(z.string()).describe("Comments to categorize"),
+      comments: z.array(z.string()).describe("Comments to analyze"),
     }),
     compile: async function (variables: z.infer<typeof this.schema>) {
-      const cacheKey = TemplateName.INSIGHT_CATEGORIZATION;
+      const cacheKey = TemplateName.INSIGHT_DETECTION;
       let template = compiledTemplateCache.get(cacheKey);
       if (!template) {
-        template = await initializeTemplates(
-          TemplateName.INSIGHT_CATEGORIZATION
-        );
+        template = await initializeTemplates(TemplateName.INSIGHT_DETECTION);
+      }
+      return template(variables);
+    },
+  };
+
+  export const INTENTION_DETECTION = {
+    version: 1,
+    schema: z.object({
+      comments: z
+        .array(z.string())
+        .describe("Comments to analyze for intentions"),
+      intentionTypes: z.array(z.string()).describe("Available intention types"),
+    }),
+    compile: async function (variables: z.infer<typeof this.schema>) {
+      const cacheKey = TemplateName.INTENTION_DETECTION;
+      let template = compiledTemplateCache.get(cacheKey);
+      if (!template) {
+        template = await initializeTemplates(TemplateName.INTENTION_DETECTION);
+      }
+      return template(variables);
+    },
+  };
+
+  export const SENTIMENT_ANALYSIS = {
+    version: 1,
+    schema: z.object({
+      commentInsightPairs: z
+        .array(
+          z.object({
+            commentIndex: z.number(),
+            comment: z.string(),
+            insightName: z.string(),
+          })
+        )
+        .describe("Comment-insight pairs to analyze sentiment"),
+      sentimentLevels: z
+        .array(
+          z.object({
+            level: z.string(),
+            name: z.string(),
+            description: z.string(),
+            severity: z.string(),
+            intensityValue: z.number(),
+          })
+        )
+        .describe("Available sentiment levels with their metadata"),
+    }),
+    compile: async function (variables: z.infer<typeof this.schema>) {
+      const cacheKey = TemplateName.SENTIMENT_ANALYSIS;
+      let template = compiledTemplateCache.get(cacheKey);
+      if (!template) {
+        template = await initializeTemplates(TemplateName.SENTIMENT_ANALYSIS);
       }
       return template(variables);
     },
   };
 
   export const promptRegistry = {
-    [TemplateName.INSIGHT_CATEGORIZATION]: INSIGHT_CATEGORIZATION,
+    [TemplateName.INSIGHT_DETECTION]: INSIGHT_DETECTION,
+    [TemplateName.INTENTION_DETECTION]: INTENTION_DETECTION,
+    [TemplateName.SENTIMENT_ANALYSIS]: SENTIMENT_ANALYSIS,
   } as const;
 
   export const PromptValidationError = NamedError.create(
@@ -91,6 +145,6 @@ export namespace PromptTemplates {
       );
     }
 
-    return await promptTemplate.compile(variables);
+    return await promptTemplate.compile(variables as any);
   }
 }

@@ -2,6 +2,9 @@ import {
   generateText as aiGenerateText,
   generateObject as aiGenerateObject,
   type ModelMessage,
+  convertToModelMessages,
+  streamText as aiStreamText,
+  type UIMessage,
 } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { google } from "@ai-sdk/google";
@@ -52,25 +55,27 @@ export namespace AI {
     return providers[provider](modelId);
   }
 
-  /** Options for text generation */
-  export interface TextOptions {
+  export interface BaseOptions {
     provider?: Provider;
     performance?: Performance;
-    messages: ModelMessage[];
     system?: string;
     temperature?: number;
     maxOutputTokens?: number;
   }
 
+  /** Options for text generation */
+  export interface TextOptions extends BaseOptions {
+    messages: ModelMessage[];
+  }
+
   /** Options for object generation */
-  export interface ObjectOptions<T> {
-    provider?: Provider;
-    performance?: Performance;
+  export interface ObjectOptions<T> extends BaseOptions {
     messages: ModelMessage[];
     schema: z.ZodType<T>;
-    system?: string;
-    temperature?: number;
-    maxOutputTokens?: number;
+  }
+
+  export interface StreamTextOptions extends BaseOptions {
+    messages: UIMessage[];
   }
 
   /**
@@ -214,6 +219,24 @@ export namespace AI {
       // Re-throw unknown errors
       throw error;
     }
+  }
+
+  export async function streamText(params: StreamTextOptions) {
+    const result = aiStreamText({
+      model: getModel(
+        params.provider ?? "google",
+        params.performance ?? "medium"
+      ),
+      messages: convertToModelMessages(params.messages),
+      system: params.system,
+      temperature: params.temperature ?? 0.7,
+      maxOutputTokens: params.maxOutputTokens,
+      abortSignal: AbortSignal.timeout(60000), // 60 second timeout
+    });
+    return result.toUIMessageStreamResponse({
+      sendSources: true,
+      sendReasoning: true,
+    });
   }
 
   /**

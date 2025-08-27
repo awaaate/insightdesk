@@ -8,12 +8,18 @@ import prompts from "prompts";
 import Table from "cli-table3";
 import { readFile } from "fs/promises";
 import { existsSync } from "fs";
+import type { SharedTypes } from "@/types/shared";
 
 // WebSocket client for real-time updates
 class WebSocketClient {
   private ws: WebSocket | null = null;
   private url: string;
-  private messageHandlers: Map<string, (data: any) => void> = new Map();
+  private messageHandlers: Map<
+    SharedTypes.WebSocket.EventType,
+    (
+      data: SharedTypes.WebSocket.EventMap[SharedTypes.WebSocket.EventType]
+    ) => void
+  > = new Map();
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
 
@@ -70,7 +76,10 @@ class WebSocketClient {
     }
   }
 
-  on(eventType: string, handler: (data: any) => void) {
+  on<
+    T extends SharedTypes.WebSocket.EventType,
+    M extends SharedTypes.WebSocket.EventMap[T],
+  >(eventType: T, handler: (data: M["data"]) => void) {
     this.messageHandlers.set(eventType, handler);
   }
 
@@ -106,10 +115,22 @@ function showBanner() {
   console.clear();
   const gradient = [chalk.cyan, chalk.blue, chalk.magenta];
   console.log("\n");
-  console.log(chalk.bold.cyan("╔════════════════════════════════════════════════╗"));
-  console.log(chalk.bold.cyan("║") + chalk.bold.white("       🧠 COMMENT INSIGHTS CLI                 ") + chalk.bold.cyan("║"));
-  console.log(chalk.bold.cyan("║") + chalk.gray("    AI-powered comment categorization          ") + chalk.bold.cyan("║"));
-  console.log(chalk.bold.cyan("╚════════════════════════════════════════════════╝"));
+  console.log(
+    chalk.bold.cyan("╔════════════════════════════════════════════════╗")
+  );
+  console.log(
+    chalk.bold.cyan("║") +
+      chalk.bold.white("    🧠 ANALYZE COMMENTS MULTI-AGENT CLI        ") +
+      chalk.bold.cyan("║")
+  );
+  console.log(
+    chalk.bold.cyan("║") +
+      chalk.gray("  LETI • GRO • PIX - AI-powered analysis       ") +
+      chalk.bold.cyan("║")
+  );
+  console.log(
+    chalk.bold.cyan("╚════════════════════════════════════════════════╝")
+  );
   console.log("\n");
 }
 
@@ -173,16 +194,17 @@ async function createComments() {
         const fileContent = await readFile(filepath, "utf-8");
         comments = fileContent
           .split("\n")
-          .map(line => line.trim())
-          .filter(line => line.length > 0);
-        
+          .map((line) => line.trim())
+          .filter((line) => line.length > 0);
+
         spinner.succeed(`Cargados ${comments.length} comentarios del archivo`);
-        
+
         // Mostrar preview
         console.log(chalk.blue("\n📄 Vista previa:"));
         const preview = comments.slice(0, 5);
         preview.forEach((comment, i) => {
-          const truncated = comment.length > 80 ? comment.substring(0, 77) + "..." : comment;
+          const truncated =
+            comment.length > 80 ? comment.substring(0, 77) + "..." : comment;
           console.log(chalk.gray(`  ${i + 1}. ${truncated}`));
         });
         if (comments.length > 5) {
@@ -206,7 +228,11 @@ async function createComments() {
     }
 
     case "paste": {
-      console.log(chalk.cyan("Pega los comentarios (uno por línea), luego presiona CTRL+D:"));
+      console.log(
+        chalk.cyan(
+          "Pega los comentarios (uno por línea), luego presiona CTRL+D:"
+        )
+      );
       const { multiline } = await prompts({
         type: "text",
         name: "multiline",
@@ -235,15 +261,15 @@ async function createComments() {
   const spinner = ora("Guardando comentarios en la base de datos...").start();
   try {
     const result = await trpc.comments.create.mutate({
-      comments: comments.map(content => ({ content }))
+      comments: comments.map((content) => ({ content })),
     });
-    
+
     spinner.succeed(`✅ ${result.comments.length} comentarios guardados`);
 
     // Mostrar tabla con resumen
     const table = new Table({
       head: [chalk.cyan("Métrica"), chalk.cyan("Valor")],
-      style: { head: [], border: [] }
+      style: { head: [], border: [] },
     });
 
     table.push(
@@ -254,9 +280,9 @@ async function createComments() {
 
     console.log("\n" + table.toString());
 
-    return { 
-      commentIds: result.commentIds, 
-      comments: result.comments 
+    return {
+      commentIds: result.commentIds,
+      comments: result.comments,
     };
   } catch (error) {
     spinner.fail("Error al guardar comentarios");
@@ -267,11 +293,13 @@ async function createComments() {
 
 // Process and monitor comments
 async function processAndMonitor(commentIds: string[]) {
-  const spinner = ora("Enviando comentarios para categorización con IA...").start();
+  const spinner = ora(
+    "Enviando comentarios para análisis multi-agente con IA..."
+  ).start();
 
   try {
     // Llamar tRPC para procesar comentarios
-    const result = await trpc.processing.categorizeComments.mutate({
+    const result = await trpc.processing.analyzeComments.mutate({
       commentIds,
     });
 
@@ -280,12 +308,12 @@ async function processAndMonitor(commentIds: string[]) {
     // Mostrar detalles del job con tabla mejorada
     const table = new Table({
       head: [chalk.bold.cyan("Métrica"), chalk.bold.cyan("Valor")],
-      style: { 
-        head: [], 
+      style: {
+        head: [],
         border: [],
-        'padding-left': 1,
-        'padding-right': 1
-      }
+        "padding-left": 1,
+        "padding-right": 1,
+      },
     });
 
     table.push(
@@ -312,13 +340,15 @@ async function processAndMonitor(commentIds: string[]) {
     let completedJobs = 0;
     let totalInsightsCreated = 0;
     let totalInsightsMatched = 0;
+    let totalIntentionsDetected = 0;
+    let totalSentimentsAnalyzed = 0;
 
     ws.on("state:changed", (data) => {
       progressData.set(data.jobId, {
         state: data.state,
         progress: data.progress || 0,
       });
-      
+
       displayProgressLive(progressData, jobIds.length);
     });
 
@@ -326,28 +356,121 @@ async function processAndMonitor(commentIds: string[]) {
       completedJobs++;
       totalInsightsCreated += data.result.createdInsights || 0;
       totalInsightsMatched += data.result.matchedInsights || 0;
-      
+
       console.log(chalk.green(`\n✅ Job ${data.jobId} completado`));
-      console.log(chalk.gray(`   📊 ${data.result.processedComments} comentarios procesados`));
-      console.log(chalk.gray(`   🔗 ${data.result.matchedInsights} insights coincidentes`));
-      console.log(chalk.gray(`   💡 ${data.result.createdInsights} nuevos insights creados`));
+      console.log(
+        chalk.gray(
+          `   📊 ${data.result.processedComments} comentarios procesados`
+        )
+      );
+      console.log(
+        chalk.gray(`   🔗 ${data.result.matchedInsights} insights coincidentes`)
+      );
+      console.log(
+        chalk.gray(
+          `   💡 ${data.result.createdInsights} nuevos insights creados`
+        )
+      );
     });
 
     ws.on("job:failed", (data) => {
       console.log(chalk.red(`\n❌ Job ${data.jobId} falló`));
-      console.log(chalk.red(`   Error: ${data.error || 'Error desconocido'}`));
+      console.log(chalk.red(`   Error: ${data.error || "Error desconocido"}`));
     });
 
-    ws.on("insight:created", (data) => {
-      console.log(chalk.magenta(`\n💡 Nuevo insight creado: ${chalk.bold.white(data.name)}`));
+    // LETI Agent Events
+    ws.on("leti:started", (data) => {
+      console.log(
+        chalk.cyan(
+          `\n🔍 LETI Agent iniciado: ${data.commentCount} comentarios, ${data.existingInsightCount} insights existentes`
+        )
+      );
+    });
+
+    ws.on("leti:insight:detected", (data) => {
+      const icon = data.isEmergent ? "✨" : "🔗";
+      console.log(
+        chalk.blue(
+          `${icon} Insight detectado: ${chalk.white(data.insightName)} (confianza: ${data.confidence})`
+        )
+      );
+    });
+
+    ws.on("leti:insight:created", (data) => {
+      console.log(
+        chalk.magenta(
+          `💡 Nuevo insight creado: ${chalk.bold.white(data.insightName)}`
+        )
+      );
       if (data.description) {
         console.log(chalk.gray(`   ${data.description}`));
       }
     });
 
-    ws.on("insight:matched", (data) => {
-      console.log(chalk.blue(`\n🔗 Insight coincidente: ${chalk.white(data.name)}`));
-      console.log(chalk.gray(`   Confianza: ${createProgressBar(data.confidence * 10, 10)} ${data.confidence}/10`));
+    ws.on("leti:completed", (data) => {
+      totalInsightsCreated += data.newInsightsCreated;
+      console.log(
+        chalk.green(
+          `✅ LETI completado: ${data.totalDetected} insights detectados, ${data.newInsightsCreated} nuevos`
+        )
+      );
+    });
+
+    // GRO Agent Events
+    ws.on("gro:started", (data) => {
+      console.log(
+        chalk.yellow(
+          `\n🎯 GRO Agent iniciado: analizando intenciones en ${data.commentCount} comentarios`
+        )
+      );
+    });
+
+    ws.on("gro:intention:detected", (data) => {
+      console.log(
+        chalk.yellow(
+          `🎯 Intención: ${data.primaryIntention} (confianza: ${data.confidence})`
+        )
+      );
+    });
+
+    ws.on("gro:completed", (data) => {
+      totalIntentionsDetected += data.totalProcessed;
+      console.log(
+        chalk.green(
+          `✅ GRO completado: ${data.totalProcessed} intenciones detectadas`
+        )
+      );
+    });
+
+    // PIX Agent Events
+    ws.on("pix:started", (data) => {
+      console.log(
+        chalk.magenta(
+          `\n😊 PIX Agent iniciado: analizando sentimiento en ${data.pairsToAnalyze} pares`
+        )
+      );
+    });
+
+    ws.on("pix:sentiment:analyzed", (data) => {
+      const emoji =
+        data.intensityValue > 0 ? "😊" : data.intensityValue < 0 ? "😔" : "😐";
+      console.log(
+        chalk.magenta(
+          `${emoji} Sentimiento: ${data.sentimentLevel} (${data.insightName})` +
+            `\nConfianza: ${data.confidence}` +
+            `\nDrivers: ${data.emotionalDrivers.join(", ")}` +
+            `\nRazón: ${data.reasoning}`
+        )
+      );
+    });
+
+    ws.on("pix:completed", (data) => {
+      totalSentimentsAnalyzed += data.totalAnalyzed;
+      console.log(
+        chalk.green(
+          `✅ PIX completado: ${data.totalAnalyzed} sentimientos analizados`
+        )
+      );
     });
 
     // Esperar completación o interrupción del usuario
@@ -355,31 +478,55 @@ async function processAndMonitor(commentIds: string[]) {
       const checkCompletion = setInterval(() => {
         if (completedJobs >= jobIds.length) {
           clearInterval(checkCompletion);
-          
+
           // Mostrar resumen final
           console.log(chalk.bold.green("\n\n✨ Procesamiento completado!"));
-          
+
           const summaryTable = new Table({
             head: [chalk.bold.cyan("Resumen Final"), chalk.bold.cyan("Valor")],
-            style: { head: [], border: [] }
+            style: { head: [], border: [] },
           });
-          
+
           summaryTable.push(
-            ["💼 Jobs completados", chalk.green(completedJobs + "/" + jobIds.length)],
-            ["💡 Nuevos insights", chalk.magenta(totalInsightsCreated.toString())],
-            ["🔗 Insights coincidentes", chalk.blue(totalInsightsMatched.toString())],
-            ["📊 Total procesado", chalk.yellow(result.details.totalComments + " comentarios")]
+            [
+              "💼 Jobs completados",
+              chalk.green(completedJobs + "/" + jobIds.length),
+            ],
+            [
+              "💡 Nuevos insights",
+              chalk.magenta(totalInsightsCreated.toString()),
+            ],
+            [
+              "🔗 Insights detectados",
+              chalk.blue(totalInsightsMatched.toString()),
+            ],
+            [
+              "🎯 Intenciones detectadas",
+              chalk.yellow(totalIntentionsDetected.toString()),
+            ],
+            [
+              "😊 Sentimientos analizados",
+              chalk.cyan(totalSentimentsAnalyzed.toString()),
+            ],
+            [
+              "📊 Total procesado",
+              chalk.yellow(result.details.totalComments + " comentarios"),
+            ]
           );
-          
+
           console.log("\n" + summaryTable.toString());
           resolve(true);
         }
       }, 1000);
-      
+
       // Permitir interrupción manual
       setTimeout(() => {
         if (completedJobs < jobIds.length) {
-          console.log(chalk.yellow("\n\n⚠ Tiempo de espera agotado. Algunos jobs pueden seguir procesándose en segundo plano."));
+          console.log(
+            chalk.yellow(
+              "\n\n⚠ Tiempo de espera agotado. Algunos jobs pueden seguir procesándose en segundo plano."
+            )
+          );
           clearInterval(checkCompletion);
           resolve(false);
         }
@@ -396,26 +543,26 @@ async function processAndMonitor(commentIds: string[]) {
 // Display progress in real-time
 function displayProgressLive(progressMap: Map<string, any>, totalJobs: number) {
   // No limpiar toda la pantalla, solo actualizar la línea
-  process.stdout.write('\r');
-  
+  process.stdout.write("\r");
+
   let completed = 0;
   let failed = 0;
   let processing = 0;
-  
+
   for (const [_, data] of progressMap.entries()) {
     if (data.state === "completed") completed++;
     else if (data.state === "failed") failed++;
     else processing++;
   }
-  
+
   const progressBar = createProgressBar((completed / totalJobs) * 100, 30);
-  
+
   process.stdout.write(
-    chalk.cyan("Progreso: ") + 
-    progressBar + 
-    chalk.yellow(` ${completed}/${totalJobs} `) +
-    (failed > 0 ? chalk.red(`[${failed} errores] `) : "") +
-    (processing > 0 ? chalk.blue(`[${processing} en proceso]`) : "")
+    chalk.cyan("Progreso: ") +
+      progressBar +
+      chalk.yellow(` ${completed}/${totalJobs} `) +
+      (failed > 0 ? chalk.red(`[${failed} errores] `) : "") +
+      (processing > 0 ? chalk.blue(`[${processing} en proceso]`) : "")
   );
 }
 
@@ -454,30 +601,35 @@ async function viewInsights() {
         chalk.bold.cyan("IA"),
         chalk.bold.cyan("Creado"),
       ],
-      style: { 
-        head: [], 
+      style: {
+        head: [],
         border: [],
-        'padding-left': 1,
-        'padding-right': 1
+        "padding-left": 1,
+        "padding-right": 1,
       },
       colWidths: [6, 25, 30, 12, 5, 12],
-      wordWrap: true
+      wordWrap: true,
     });
 
     insights.forEach((insight) => {
       const createdDate = new Date(insight.created_at).toLocaleDateString();
-      const name = insight.name.length > 23 ? insight.name.substring(0, 20) + "..." : insight.name;
-      const desc = insight.description ? 
-        (insight.description.length > 28 ? insight.description.substring(0, 25) + "..." : insight.description) : 
-        chalk.gray("Sin descripción");
-      
+      const name =
+        insight.name.length > 23
+          ? insight.name.substring(0, 20) + "..."
+          : insight.name;
+      const desc = insight.description
+        ? insight.description.length > 28
+          ? insight.description.substring(0, 25) + "..."
+          : insight.description
+        : chalk.gray("Sin descripción");
+
       table.push([
         chalk.yellow(insight.id.toString()),
         chalk.white(name),
         chalk.gray(desc),
         chalk.blue(insight.commentCount.toString()),
         insight.ai_generated ? chalk.green("✓") : chalk.gray("✗"),
-        chalk.gray(createdDate)
+        chalk.gray(createdDate),
       ]);
     });
 
@@ -485,27 +637,40 @@ async function viewInsights() {
 
     // Mostrar estadísticas
     const stats = await trpc.insights.stats.query();
-    
+
     console.log(chalk.bold.blue("\n📊 Estadísticas:"));
     const statsTable = new Table({
-      style: { head: [], border: [] }
+      style: { head: [], border: [] },
     });
-    
+
     statsTable.push(
-      [chalk.cyan("Total Insights:"), chalk.white(stats.totalInsights.toString())],
-      [chalk.cyan("Generados por IA:"), chalk.green(stats.aiGeneratedInsights.toString())],
+      [
+        chalk.cyan("Total Insights:"),
+        chalk.white(stats.totalInsights.toString()),
+      ],
+      [
+        chalk.cyan("Generados por IA:"),
+        chalk.green(stats.aiGeneratedInsights.toString()),
+      ],
       [chalk.cyan("Manuales:"), chalk.yellow(stats.manualInsights.toString())],
-      [chalk.cyan("Promedio comentarios:"), chalk.blue(stats.avgCommentsPerInsight.toString())],
-      [chalk.cyan("Últimas 24h:"), chalk.magenta(stats.recentInsights.toString())],
+      [
+        chalk.cyan("Promedio comentarios:"),
+        chalk.blue(stats.avgCommentsPerInsight.toString()),
+      ],
+      [
+        chalk.cyan("Últimas 24h:"),
+        chalk.magenta(stats.recentInsights.toString()),
+      ],
       [chalk.cyan("Tasa IA:"), chalk.white(`${stats.aiGenerationRate}%`)]
     );
-    
+
     console.log(statsTable.toString());
 
     if (pagination.hasMore) {
-      console.log(chalk.gray(`\n... y ${pagination.total - insights.length} más`));
+      console.log(
+        chalk.gray(`\n... y ${pagination.total - insights.length} más`)
+      );
     }
-
   } catch (error) {
     spinner.fail("Error al cargar insights");
     console.error(chalk.red("Detalles:"), error);
@@ -520,7 +685,7 @@ async function realtimeMonitor() {
   try {
     await ws.connect();
     spinner.succeed("Conectado al monitor en tiempo real");
-    
+
     console.log(chalk.gray("\nMonitoreando todos los eventos del sistema..."));
     console.log(chalk.gray("Presiona Ctrl+C para detener\n"));
 
@@ -532,9 +697,9 @@ async function realtimeMonitor() {
       console.clear();
       showBanner();
       console.log(chalk.bold.blue("📡 Monitor en Tiempo Real\n"));
-      
-      eventLog.forEach(event => console.log(event));
-      
+
+      eventLog.forEach((event) => console.log(event));
+
       console.log(chalk.gray("\n" + "─".repeat(50)));
       console.log(chalk.gray("Presiona Ctrl+C para salir"));
     };
@@ -552,27 +717,54 @@ async function realtimeMonitor() {
     });
 
     ws.on("state:changed", (data) => {
-      const stateMsg = data.state === "analyzing" ? "🔄 Analizando" :
-                       data.state === "completed" ? "✅ Completado" :
-                       data.state === "failed" ? "❌ Fallido" : "⏳ En espera";
+      const stateMsg =
+        data.state === "analyzing"
+          ? "🔄 Analizando"
+          : data.state === "completed"
+            ? "✅ Completado"
+            : data.state === "failed"
+              ? "❌ Fallido"
+              : "⏳ En espera";
       addEvent(`${stateMsg}: ${data.jobId} (${data.progress || 0}%)`);
     });
 
-    ws.on("insight:created", (data) => {
-      addEvent(chalk.magenta(`💡 Nuevo insight: ${data.name}`));
+    // LETI Events
+    ws.on("leti:insight:detected", (data) => {
+      const icon = data.isEmergent ? "✨" : "🔗";
+      addEvent(chalk.blue(`${icon} LETI: ${data.insightName}`));
     });
 
-    ws.on("insight:matched", (data) => {
-      addEvent(chalk.blue(`🔗 Match: ${data.name} (confianza: ${data.confidence}/10)`));
+    ws.on("leti:insight:created", (data) => {
+      addEvent(chalk.magenta(`💡 LETI nuevo: ${data.insightName}`));
     });
 
-    ws.on("analysis:completed", (data) => {
-      addEvent(chalk.green(`✨ Análisis completado: ${data.totalAnalyzed} comentarios`));
+    // GRO Events
+    ws.on(
+      "gro:intention:detected",
+      (
+        data: SharedTypes.WebSocket.EventMap["gro:intention:detected"]["data"]
+      ) => {
+        addEvent(chalk.yellow(`🎯 GRO: ${data.primaryIntention}`));
+      }
+    );
+
+    // PIX Events
+    ws.on("pix:sentiment:analyzed", (data) => {
+      const emoji =
+        data.intensityValue > 0 ? "😊" : data.intensityValue < 0 ? "😔" : "😐";
+      addEvent(chalk.cyan(`${emoji} PIX: ${data.sentimentLevel}`));
+    });
+
+    ws.on("job:completed", (data) => {
+      addEvent(
+        chalk.green(
+          `✨ Job completado: ${data.result.processedComments} comentarios`
+        )
+      );
     });
 
     // Mantener abierto hasta interrupción
     await new Promise(() => {});
-    
   } catch (error) {
     spinner.fail("Error al conectar");
     console.error(chalk.red("Detalles:"), error);
@@ -614,7 +806,7 @@ async function main() {
             message: "¿Deseas procesar estos comentarios con IA ahora?",
             initial: true,
           });
-          
+
           if (process) {
             await processAndMonitor(result.commentIds);
           }
@@ -629,7 +821,7 @@ async function main() {
       case "monitor":
         await realtimeMonitor();
         break;
-        
+
       case "stats":
         await showStats();
         break;
@@ -658,42 +850,56 @@ async function main() {
 // Mostrar estadísticas generales
 async function showStats() {
   const spinner = ora("Cargando estadísticas...").start();
-  
+
   try {
     const stats = await trpc.insights.stats.query();
     spinner.succeed("Estadísticas cargadas");
-    
+
     console.log(chalk.bold.blue("\n📊 ESTADÍSTICAS DEL SISTEMA\n"));
-    
+
     const table = new Table({
-      style: { 
-        head: [], 
+      style: {
+        head: [],
         border: [],
-        'padding-left': 2,
-        'padding-right': 2
-      }
+        "padding-left": 2,
+        "padding-right": 2,
+      },
     });
-    
+
     table.push(
-      [chalk.cyan("📚 Total Insights"), chalk.bold.white(stats.totalInsights.toString())],
+      [
+        chalk.cyan("📚 Total Insights"),
+        chalk.bold.white(stats.totalInsights.toString()),
+      ],
       ["", ""],
-      [chalk.cyan("🤖 Generados por IA"), chalk.green(stats.aiGeneratedInsights.toString())],
-      [chalk.cyan("✍️  Manuales"), chalk.yellow(stats.manualInsights.toString())],
+      [
+        chalk.cyan("🤖 Generados por IA"),
+        chalk.green(stats.aiGeneratedInsights.toString()),
+      ],
+      [
+        chalk.cyan("✍️  Manuales"),
+        chalk.yellow(stats.manualInsights.toString()),
+      ],
       [chalk.cyan("📈 Tasa de IA"), chalk.white(`${stats.aiGenerationRate}%`)],
       ["", ""],
-      [chalk.cyan("💬 Promedio comentarios/insight"), chalk.blue(stats.avgCommentsPerInsight.toString())],
-      [chalk.cyan("🆕 Últimas 24 horas"), chalk.magenta(stats.recentInsights.toString())]
+      [
+        chalk.cyan("💬 Promedio comentarios/insight"),
+        chalk.blue(stats.avgCommentsPerInsight.toString()),
+      ],
+      [
+        chalk.cyan("🆕 Últimas 24 horas"),
+        chalk.magenta(stats.recentInsights.toString()),
+      ]
     );
-    
+
     console.log(table.toString());
-    
+
     // Gráfico de barras simple
     console.log(chalk.bold.blue("\n📈 Distribución:\n"));
     const aiBar = createProgressBar(stats.aiGenerationRate, 40);
     console.log(`  IA:     ${aiBar} ${stats.aiGenerationRate}%`);
     const manualBar = createProgressBar(100 - stats.aiGenerationRate, 40);
     console.log(`  Manual: ${manualBar} ${100 - stats.aiGenerationRate}%`);
-    
   } catch (error) {
     spinner.fail("Error al cargar estadísticas");
     console.error(chalk.red("Detalles:"), error);

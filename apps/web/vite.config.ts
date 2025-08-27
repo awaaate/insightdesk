@@ -11,7 +11,10 @@ export default defineConfig(({ mode }) => {
     resolve: {
       alias: {
         "@": path.resolve(__dirname, "./src"),
-        config: path.resolve(__dirname, "../server/src/config/index.ts"),
+        "types/shared": path.resolve(
+          __dirname,
+          "../server/src/types/shared.ts"
+        ),
       },
     },
     server: {

@@ -12,8 +12,9 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DashboardIndexRouteImport } from './routes/dashboard.index'
-import { Route as DashboardSourcesRouteImport } from './routes/dashboard.sources'
-import { Route as DashboardAttributesRouteImport } from './routes/dashboard.attributes'
+import { Route as DashboardProcessingRouteImport } from './routes/dashboard.processing'
+import { Route as DashboardCommentsRouteImport } from './routes/dashboard.comments'
+import { Route as DashboardAgentLogsRouteImport } from './routes/dashboard.agent-logs'
 
 const DashboardRoute = DashboardRouteImport.update({
   id: '/dashboard',
@@ -30,36 +31,44 @@ const DashboardIndexRoute = DashboardIndexRouteImport.update({
   path: '/',
   getParentRoute: () => DashboardRoute,
 } as any)
-const DashboardSourcesRoute = DashboardSourcesRouteImport.update({
-  id: '/sources',
-  path: '/sources',
+const DashboardProcessingRoute = DashboardProcessingRouteImport.update({
+  id: '/processing',
+  path: '/processing',
   getParentRoute: () => DashboardRoute,
 } as any)
-const DashboardAttributesRoute = DashboardAttributesRouteImport.update({
-  id: '/attributes',
-  path: '/attributes',
+const DashboardCommentsRoute = DashboardCommentsRouteImport.update({
+  id: '/comments',
+  path: '/comments',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardAgentLogsRoute = DashboardAgentLogsRouteImport.update({
+  id: '/agent-logs',
+  path: '/agent-logs',
   getParentRoute: () => DashboardRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRouteWithChildren
-  '/dashboard/attributes': typeof DashboardAttributesRoute
-  '/dashboard/sources': typeof DashboardSourcesRoute
+  '/dashboard/agent-logs': typeof DashboardAgentLogsRoute
+  '/dashboard/comments': typeof DashboardCommentsRoute
+  '/dashboard/processing': typeof DashboardProcessingRoute
   '/dashboard/': typeof DashboardIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/dashboard/attributes': typeof DashboardAttributesRoute
-  '/dashboard/sources': typeof DashboardSourcesRoute
+  '/dashboard/agent-logs': typeof DashboardAgentLogsRoute
+  '/dashboard/comments': typeof DashboardCommentsRoute
+  '/dashboard/processing': typeof DashboardProcessingRoute
   '/dashboard': typeof DashboardIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRouteWithChildren
-  '/dashboard/attributes': typeof DashboardAttributesRoute
-  '/dashboard/sources': typeof DashboardSourcesRoute
+  '/dashboard/agent-logs': typeof DashboardAgentLogsRoute
+  '/dashboard/comments': typeof DashboardCommentsRoute
+  '/dashboard/processing': typeof DashboardProcessingRoute
   '/dashboard/': typeof DashboardIndexRoute
 }
 export interface FileRouteTypes {
@@ -67,17 +76,24 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/dashboard'
-    | '/dashboard/attributes'
-    | '/dashboard/sources'
+    | '/dashboard/agent-logs'
+    | '/dashboard/comments'
+    | '/dashboard/processing'
     | '/dashboard/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/dashboard/attributes' | '/dashboard/sources' | '/dashboard'
+  to:
+    | '/'
+    | '/dashboard/agent-logs'
+    | '/dashboard/comments'
+    | '/dashboard/processing'
+    | '/dashboard'
   id:
     | '__root__'
     | '/'
     | '/dashboard'
-    | '/dashboard/attributes'
-    | '/dashboard/sources'
+    | '/dashboard/agent-logs'
+    | '/dashboard/comments'
+    | '/dashboard/processing'
     | '/dashboard/'
   fileRoutesById: FileRoutesById
 }
@@ -109,32 +125,41 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardIndexRouteImport
       parentRoute: typeof DashboardRoute
     }
-    '/dashboard/sources': {
-      id: '/dashboard/sources'
-      path: '/sources'
-      fullPath: '/dashboard/sources'
-      preLoaderRoute: typeof DashboardSourcesRouteImport
+    '/dashboard/processing': {
+      id: '/dashboard/processing'
+      path: '/processing'
+      fullPath: '/dashboard/processing'
+      preLoaderRoute: typeof DashboardProcessingRouteImport
       parentRoute: typeof DashboardRoute
     }
-    '/dashboard/attributes': {
-      id: '/dashboard/attributes'
-      path: '/attributes'
-      fullPath: '/dashboard/attributes'
-      preLoaderRoute: typeof DashboardAttributesRouteImport
+    '/dashboard/comments': {
+      id: '/dashboard/comments'
+      path: '/comments'
+      fullPath: '/dashboard/comments'
+      preLoaderRoute: typeof DashboardCommentsRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/agent-logs': {
+      id: '/dashboard/agent-logs'
+      path: '/agent-logs'
+      fullPath: '/dashboard/agent-logs'
+      preLoaderRoute: typeof DashboardAgentLogsRouteImport
       parentRoute: typeof DashboardRoute
     }
   }
 }
 
 interface DashboardRouteChildren {
-  DashboardAttributesRoute: typeof DashboardAttributesRoute
-  DashboardSourcesRoute: typeof DashboardSourcesRoute
+  DashboardAgentLogsRoute: typeof DashboardAgentLogsRoute
+  DashboardCommentsRoute: typeof DashboardCommentsRoute
+  DashboardProcessingRoute: typeof DashboardProcessingRoute
   DashboardIndexRoute: typeof DashboardIndexRoute
 }
 
 const DashboardRouteChildren: DashboardRouteChildren = {
-  DashboardAttributesRoute: DashboardAttributesRoute,
-  DashboardSourcesRoute: DashboardSourcesRoute,
+  DashboardAgentLogsRoute: DashboardAgentLogsRoute,
+  DashboardCommentsRoute: DashboardCommentsRoute,
+  DashboardProcessingRoute: DashboardProcessingRoute,
   DashboardIndexRoute: DashboardIndexRoute,
 }
 

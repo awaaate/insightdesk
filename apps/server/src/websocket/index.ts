@@ -1,41 +1,13 @@
 import { Bus } from "@/bus";
-import { CommentCategorization } from "@/queues/workers/commentCategorization";
-import { z } from "zod";
+import { SharedTypes } from "@/types/shared";
 import type { ServerWebSocket } from "bun";
-
+import { AnalyzeComments } from "@/queues/workers/analyze-comments";
 /**
  * WebSocket namespace for real-time event streaming
  */
 export namespace WebSocketServer {
   /**
-   * WebSocket message types
-   */
-  export namespace Messages {
-    export const ClientMessage = z.discriminatedUnion("type", [
-      z.object({
-        type: z.literal("subscribe:jobs"),
-        jobIds: z.array(z.string()).optional(),
-      }),
-      z.object({
-        type: z.literal("unsubscribe:jobs"),
-        jobIds: z.array(z.string()).optional(),
-      }),
-      z.object({
-        type: z.literal("ping"),
-      }),
-    ]);
-
-    export type ClientMessage = z.infer<typeof ClientMessage>;
-
-    export interface ServerMessage {
-      type: string;
-      timestamp: string;
-      data?: any;
-    }
-  }
-
-  /**
-   * Connection management
+   * Connection management namespace
    */
   export namespace Connections {
     const connections = new Set<ServerWebSocket>();
@@ -74,7 +46,9 @@ export namespace WebSocketServer {
       return subscriptions.get(jobId) || new Set();
     }
 
-    export function broadcast(message: Messages.ServerMessage): void {
+    export function broadcast(
+      message: SharedTypes.WebSocket.Server.Message
+    ): void {
       const messageStr = JSON.stringify(message);
       for (const ws of connections) {
         ws.send(messageStr);
@@ -83,7 +57,7 @@ export namespace WebSocketServer {
 
     export function sendToSubscribers(
       jobId: string,
-      message: Messages.ServerMessage
+      message: SharedTypes.WebSocket.Server.Message
     ): void {
       const messageStr = JSON.stringify(message);
       for (const ws of getSubscribers(jobId)) {
@@ -106,35 +80,111 @@ export namespace WebSocketServer {
   }
 
   /**
+   * Message sending utilities namespace
+   */
+  export namespace MessageSender {
+    export function send(
+      ws: ServerWebSocket,
+      message: SharedTypes.WebSocket.Server.Message
+    ): void {
+      ws.send(JSON.stringify(message));
+    }
+
+    export function sendJobStarted(
+      ws: ServerWebSocket,
+      jobId: string,
+      commentIds: string[]
+    ): void {
+      const message: SharedTypes.WebSocket.Server.JobStarted = {
+        type: "job:started",
+        timestamp: new Date().toISOString(),
+        data: {
+          jobId,
+          commentIds,
+          timestamp: new Date().toISOString(),
+        },
+      };
+      send(ws, message);
+    }
+
+    export function sendJobCompleted(
+      ws: ServerWebSocket,
+      jobId: string,
+      result: SharedTypes.Domain.Job.ProcessingResult,
+      duration: number
+    ): void {
+      const message: SharedTypes.WebSocket.Server.JobCompleted = {
+        type: "job:completed",
+        timestamp: new Date().toISOString(),
+        data: {
+          jobId,
+          result,
+          duration,
+          timestamp: new Date().toISOString(),
+        },
+      };
+      send(ws, message);
+    }
+
+    export function sendStateChanged(
+      ws: ServerWebSocket,
+      stateData: SharedTypes.WebSocket.Server.StateChangedData
+    ): void {
+      const message: SharedTypes.WebSocket.Server.StateChanged = {
+        type: "state:changed",
+        timestamp: new Date().toISOString(),
+        data: stateData,
+      };
+      send(ws, message);
+    }
+
+    export function sendError(ws: ServerWebSocket, errorMessage: string): void {
+      const message: SharedTypes.WebSocket.Server.Error = {
+        type: "error",
+        timestamp: new Date().toISOString(),
+        data: {
+          message: errorMessage,
+        },
+      };
+      send(ws, message);
+    }
+
+    export function sendPong(ws: ServerWebSocket): void {
+      const message: SharedTypes.WebSocket.Server.Pong = {
+        type: "pong",
+        timestamp: new Date().toISOString(),
+        data: {
+          stats: {
+            totalConnections: Connections.getStats().totalConnections,
+            totalSubscriptions: Connections.getStats().totalSubscriptions,
+          },
+        },
+      };
+      send(ws, message);
+    }
+  }
+
+  /**
    * Event handlers for Bus events
    */
   export namespace EventHandlers {
     const unsubscribers: Array<() => void> = [];
 
     export function initialize(): void {
-      // Subscribe to all CommentCategorization events
-      
+      // Subscribe to all AnalyzeComments events
+
       // Job lifecycle events
       unsubscribers.push(
-        Bus.subscribe(CommentCategorization.Events.jobStarted, (event) => {
+        Bus.subscribe(AnalyzeComments.Events.jobStarted, (event) => {
           const jobId = event.properties.jobId;
-          const message: Messages.ServerMessage = {
+          const message: SharedTypes.WebSocket.Server.JobStarted = {
             type: "job:started",
-            timestamp: event.properties.timestamp.toISOString(),
-            data: event.properties,
-          };
-          Connections.sendToSubscribers(jobId, message);
-          Connections.broadcast(message); // Also broadcast to all
-        })
-      );
-
-      unsubscribers.push(
-        Bus.subscribe(CommentCategorization.Events.jobCompleted, (event) => {
-          const jobId = event.properties.jobId;
-          const message: Messages.ServerMessage = {
-            type: "job:completed",
-            timestamp: event.properties.timestamp.toISOString(),
-            data: event.properties,
+            timestamp: event.properties.timestamp,
+            data: {
+              jobId: event.properties.jobId,
+              commentIds: event.properties.commentIds,
+              timestamp: event.properties.timestamp,
+            },
           };
           Connections.sendToSubscribers(jobId, message);
           Connections.broadcast(message);
@@ -142,12 +192,37 @@ export namespace WebSocketServer {
       );
 
       unsubscribers.push(
-        Bus.subscribe(CommentCategorization.Events.jobFailed, (event) => {
+        Bus.subscribe(AnalyzeComments.Events.jobCompleted, (event) => {
           const jobId = event.properties.jobId;
-          const message: Messages.ServerMessage = {
+          const message: SharedTypes.WebSocket.Server.JobCompleted = {
+            type: "job:completed",
+            timestamp: event.properties.timestamp,
+            data: {
+              jobId: event.properties.jobId,
+              result: event.properties.result,
+              duration: event.properties.duration,
+              timestamp: event.properties.timestamp,
+            },
+          };
+          Connections.sendToSubscribers(jobId, message);
+          Connections.broadcast(message);
+        })
+      );
+
+      unsubscribers.push(
+        Bus.subscribe(AnalyzeComments.Events.jobFailed, (event) => {
+          const jobId = event.properties.jobId;
+          const message: SharedTypes.WebSocket.Server.JobFailed = {
             type: "job:failed",
-            timestamp: event.properties.timestamp.toISOString(),
-            data: event.properties,
+            timestamp: event.properties.timestamp,
+            data: {
+              jobId: event.properties.jobId,
+              error: event.properties.error,
+              errorType: event.properties.errorType,
+              timestamp: event.properties.timestamp,
+              errorContext: event.properties.errorContext,
+              originalError: event.properties.originalError,
+            },
           };
           Connections.sendToSubscribers(jobId, message);
           Connections.broadcast(message);
@@ -156,60 +231,133 @@ export namespace WebSocketServer {
 
       // State changes
       unsubscribers.push(
-        Bus.subscribe(CommentCategorization.Events.stateChanged, (event) => {
+        Bus.subscribe(AnalyzeComments.Events.stateChanged, (event) => {
           const jobId = event.properties.jobId;
-          const message: Messages.ServerMessage = {
+          const message: SharedTypes.WebSocket.Server.StateChanged = {
             type: "state:changed",
-            timestamp: event.properties.timestamp.toISOString(),
-            data: event.properties,
+            timestamp: event.properties.timestamp,
+            data: event.properties as SharedTypes.WebSocket.Server.StateChangedData,
           };
           Connections.sendToSubscribers(jobId, message);
         })
       );
 
-      // Analysis events
+      // LETI Agent Events
       unsubscribers.push(
-        Bus.subscribe(CommentCategorization.Events.analysisStarted, (event) => {
-          Connections.broadcast({
-            type: "analysis:started",
-            timestamp: event.properties.timestamp.toISOString(),
+        Bus.subscribe(AnalyzeComments.Events.letiStarted, (event) => {
+          const message: SharedTypes.WebSocket.Server.LetiStarted = {
+            type: "leti:started",
+            timestamp: event.properties.timestamp,
             data: event.properties,
-          });
+          };
+          Connections.broadcast(message);
         })
       );
 
       unsubscribers.push(
-        Bus.subscribe(CommentCategorization.Events.analysisCompleted, (event) => {
-          Connections.broadcast({
-            type: "analysis:completed",
-            timestamp: event.properties.timestamp.toISOString(),
+        Bus.subscribe(AnalyzeComments.Events.letiInsightDetected, (event) => {
+          const message: SharedTypes.WebSocket.Server.LetiInsightDetected = {
+            type: "leti:insight:detected",
+            timestamp: event.properties.timestamp,
             data: event.properties,
-          });
-        })
-      );
-
-      // Insight events
-      unsubscribers.push(
-        Bus.subscribe(CommentCategorization.Events.insightCreated, (event) => {
-          Connections.broadcast({
-            type: "insight:created",
-            timestamp: event.properties.timestamp.toISOString(),
-            data: event.properties,
-          });
+          };
+          Connections.broadcast(message);
         })
       );
 
       unsubscribers.push(
-        Bus.subscribe(CommentCategorization.Events.insightMatched, (event) => {
-          Connections.broadcast({
-            type: "insight:matched",
-            timestamp: event.properties.timestamp.toISOString(),
+        Bus.subscribe(AnalyzeComments.Events.letiNewInsightCreated, (event) => {
+          const message: SharedTypes.WebSocket.Server.LetiNewInsightCreated = {
+            type: "leti:insight:created",
+            timestamp: event.properties.timestamp,
             data: event.properties,
-          });
+          };
+          Connections.broadcast(message);
         })
       );
 
-      console.log("✅ WebSocket event handlers initialized");
+      unsubscribers.push(
+        Bus.subscribe(AnalyzeComments.Events.letiCompleted, (event) => {
+          const message: SharedTypes.WebSocket.Server.LetiCompleted = {
+            type: "leti:completed",
+            timestamp: event.properties.timestamp,
+            data: event.properties,
+          };
+          Connections.broadcast(message);
+        })
+      );
+
+      // GRO Agent Events
+      unsubscribers.push(
+        Bus.subscribe(AnalyzeComments.Events.groStarted, (event) => {
+          const message: SharedTypes.WebSocket.Server.GroStarted = {
+            type: "gro:started",
+            timestamp: event.properties.timestamp,
+            data: event.properties,
+          };
+          Connections.broadcast(message);
+        })
+      );
+
+      unsubscribers.push(
+        Bus.subscribe(AnalyzeComments.Events.groIntentionDetected, (event) => {
+          const message: SharedTypes.WebSocket.Server.GroIntentionDetected = {
+            type: "gro:intention:detected",
+            timestamp: event.properties.timestamp,
+            data: event.properties,
+          };
+          Connections.broadcast(message);
+        })
+      );
+
+      unsubscribers.push(
+        Bus.subscribe(AnalyzeComments.Events.groCompleted, (event) => {
+          const message: SharedTypes.WebSocket.Server.GroCompleted = {
+            type: "gro:completed",
+            timestamp: event.properties.timestamp,
+            data: event.properties,
+          };
+          Connections.broadcast(message);
+        })
+      );
+
+      // PIX Agent Events
+      unsubscribers.push(
+        Bus.subscribe(AnalyzeComments.Events.pixStarted, (event) => {
+          const message: SharedTypes.WebSocket.Server.PixStarted = {
+            type: "pix:started",
+            timestamp: event.properties.timestamp,
+            data: event.properties,
+          };
+          Connections.broadcast(message);
+        })
+      );
+
+      unsubscribers.push(
+        Bus.subscribe(AnalyzeComments.Events.pixSentimentAnalyzed, (event) => {
+          const message: SharedTypes.WebSocket.Server.PixSentimentAnalyzed = {
+            type: "pix:sentiment:analyzed",
+            timestamp: event.properties.timestamp,
+            data: event.properties,
+          };
+          Connections.broadcast(message);
+        })
+      );
+
+      unsubscribers.push(
+        Bus.subscribe(AnalyzeComments.Events.pixCompleted, (event) => {
+          const message: SharedTypes.WebSocket.Server.PixCompleted = {
+            type: "pix:completed",
+            timestamp: event.properties.timestamp,
+            data: event.properties,
+          };
+          Connections.broadcast(message);
+        })
+      );
+
+      console.log(
+        "✅ WebSocket event handlers initialized for AnalyzeComments multi-agent system"
+      );
     }
 
     export function cleanup(): void {
@@ -228,77 +376,45 @@ export namespace WebSocketServer {
     open(ws: ServerWebSocket) {
       console.log("🔌 WebSocket connection opened");
       Connections.add(ws);
-      
+
       // Send welcome message
-      ws.send(
-        JSON.stringify({
+      const welcomeMessage: SharedTypes.WebSocket.Server.ConnectionEstablished =
+        {
           type: "connection:established",
           timestamp: new Date().toISOString(),
           data: {
-            message: "Connected to Comment Categorization stream",
+            message:
+              "Connected to AnalyzeComments Multi-Agent Processing Stream",
             stats: Connections.getStats(),
           },
-        } as Messages.ServerMessage)
-      );
+        };
+      MessageSender.send(ws, welcomeMessage);
     },
 
     message(ws: ServerWebSocket, message: string | Buffer) {
       try {
-        const data = Messages.ClientMessage.parse(
+        const data = SharedTypes.WebSocket.Client.MessageSchema.parse(
           JSON.parse(message.toString())
         );
 
         switch (data.type) {
           case "subscribe:jobs":
-            if (data.jobIds) {
-              for (const jobId of data.jobIds) {
-                Connections.subscribe(jobId, ws);
-              }
-              ws.send(
-                JSON.stringify({
-                  type: "subscription:confirmed",
-                  timestamp: new Date().toISOString(),
-                  data: { jobIds: data.jobIds },
-                } as Messages.ServerMessage)
-              );
-            }
+            handleSubscription(ws, data.jobIds);
             break;
 
           case "unsubscribe:jobs":
-            if (data.jobIds) {
-              for (const jobId of data.jobIds) {
-                Connections.unsubscribe(jobId, ws);
-              }
-              ws.send(
-                JSON.stringify({
-                  type: "unsubscription:confirmed",
-                  timestamp: new Date().toISOString(),
-                  data: { jobIds: data.jobIds },
-                } as Messages.ServerMessage)
-              );
-            }
+            handleUnsubscription(ws, data.jobIds);
             break;
 
           case "ping":
-            ws.send(
-              JSON.stringify({
-                type: "pong",
-                timestamp: new Date().toISOString(),
-                data: { stats: Connections.getStats() },
-              } as Messages.ServerMessage)
-            );
+            MessageSender.sendPong(ws);
             break;
         }
       } catch (error) {
         console.error("Error processing WebSocket message:", error);
-        ws.send(
-          JSON.stringify({
-            type: "error",
-            timestamp: new Date().toISOString(),
-            data: {
-              message: error instanceof Error ? error.message : "Invalid message",
-            },
-          } as Messages.ServerMessage)
+        MessageSender.sendError(
+          ws,
+          error instanceof Error ? error.message : "Invalid message"
         );
       }
     },
@@ -313,6 +429,39 @@ export namespace WebSocketServer {
       Connections.remove(ws);
     },
   };
+
+  /**
+   * Handler functions for WebSocket operations
+   */
+  function handleSubscription(ws: ServerWebSocket, jobIds?: string[]): void {
+    if (jobIds) {
+      for (const jobId of jobIds) {
+        Connections.subscribe(jobId, ws);
+      }
+      const confirmMessage: SharedTypes.WebSocket.Server.SubscriptionConfirmed =
+        {
+          type: "subscription:confirmed",
+          timestamp: new Date().toISOString(),
+          data: { jobIds },
+        };
+      MessageSender.send(ws, confirmMessage);
+    }
+  }
+
+  function handleUnsubscription(ws: ServerWebSocket, jobIds?: string[]): void {
+    if (jobIds) {
+      for (const jobId of jobIds) {
+        Connections.unsubscribe(jobId, ws);
+      }
+      const confirmMessage: SharedTypes.WebSocket.Server.UnsubscriptionConfirmed =
+        {
+          type: "unsubscription:confirmed",
+          timestamp: new Date().toISOString(),
+          data: { jobIds },
+        };
+      MessageSender.send(ws, confirmMessage);
+    }
+  }
 
   /**
    * Initialize the WebSocket server

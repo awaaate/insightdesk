@@ -13,7 +13,7 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
-      "config": ["../server/src/config/index.ts"]
+      "types/shared": ["../server/src/types/shared.ts"]
     }
   },
   "references": [

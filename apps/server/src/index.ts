@@ -1,5 +1,6 @@
 import "dotenv/config";
-import "./queues/workers";
+import { Env } from "./env";
+Env.validate();
 
 import { trpcServer } from "@hono/trpc-server";
 import { Hono } from "hono";
@@ -9,14 +10,15 @@ import { createContext } from "./lib/context";
 import { Queues } from "./queues";
 import { appRouter } from "./routers/index";
 import { WebSocketServer } from "./websocket";
-import { CommentCategorization } from "./queues/workers/commentCategorization";
 
 import { HonoAdapter } from "@bull-board/hono";
 import { createBullBoard } from "@bull-board/api";
 import { BullMQAdapter } from "@bull-board/api/bullMQAdapter";
-import { Env } from "./env";
 import { serveStatic } from "@hono/node-server/serve-static";
-Env.validate();
+import { streamText, convertToModelMessages } from "ai";
+import type { UIMessage } from "ai";
+import { AI } from "./ai";
+
 const app = new Hono({ strict: false });
 
 // Setup Bull Board with all queues
@@ -64,6 +66,9 @@ app.use(
     },
   })
 );
+
+//server static files from public folder
+app.get("/*", serveStatic({ root: "./public" }));
 
 // API Documentation
 app.get("/api", (c) => {
@@ -115,12 +120,29 @@ app.get("/", (c) => {
   return c.redirect("/api");
 });
 
+app.post("/api/chat", async (c) => {
+  const {
+    messages,
+    model,
+    webSearch,
+  }: { messages: UIMessage[]; model: string; webSearch: boolean } =
+    await c.req.json();
+
+  return AI.streamText({
+    messages,
+    provider: "openai",
+    performance: "medium",
+    system:
+      "You are a helpful assistant that can answer questions and help with tasks",
+  });
+});
+
 // Initialize WebSocket server
 WebSocketServer.initialize();
 
 // Initialize Comment Categorization Worker
-CommentCategorization.createWorker().then(() => {
-  visualLogger.log("success", "Comment Categorization Worker started");
+Queues.AnalyzeComments.createWorker().then(() => {
+  visualLogger.log("success", "Analyze Comments Worker started");
 });
 
 // Create Bun server with WebSocket support
@@ -129,14 +151,14 @@ const server = Bun.serve({
   hostname: "0.0.0.0", // Listen on all interfaces for Docker
   fetch(request, server) {
     // Check if this is a WebSocket upgrade request
-    const upgradeHeader = request.headers.get('upgrade');
-    if (upgradeHeader === 'websocket') {
+    const upgradeHeader = request.headers.get("upgrade");
+    if (upgradeHeader === "websocket") {
       // Let Bun handle the WebSocket upgrade
       if (server.upgrade(request)) {
         return; // Upgrade successful
       }
       // Upgrade failed
-      return new Response('WebSocket upgrade failed', { status: 400 });
+      return new Response("WebSocket upgrade failed", { status: 400 });
     }
     // Handle regular HTTP requests through Hono
     return app.fetch(request);

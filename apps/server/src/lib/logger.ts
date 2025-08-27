@@ -1,11 +1,13 @@
-// src/config/logger.ts
 import pino from "pino";
 import { Env } from "@/env";
+import chalk from "chalk";
 
-// Configuración del logger
 export const logger = pino({
   level: Env.isProduction ? "warn" : "info",
-  transport: Env.isProduction
-    ? { target: "pino-pretty", options: { colorize: true } }
-    : undefined,
+  transport: {
+    target: "pino-pretty",
+    options: {
+      colorize: true,
+    },
+  },
 });

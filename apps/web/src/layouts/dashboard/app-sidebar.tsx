@@ -9,7 +9,6 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { NavBrand } from "./nav-brand";
 import {
   HelpCircle,
   LayoutDashboard,
@@ -17,6 +16,8 @@ import {
   Link2,
   Search,
   Settings,
+  MessageCircle,
+  Sparkles,
 } from "lucide-react";
 import { NavMain } from "./nav-main";
 import { NavSecondary } from "./nav-secondary";
@@ -29,14 +30,19 @@ const data = {
       icon: <LayoutDashboard className="w-4 h-4" />,
     },
     {
-      title: "Attributes Analysis",
-      url: "/dashboard/attributes",
-      icon: <Lightbulb className="w-4 h-4" />,
+      title: "Comment Processing",
+      url: "/dashboard/processing",
+      icon: <MessageCircle className="w-4 h-4" />,
     },
     {
-      title: "Sources Analysis",
-      url: "/dashboard/sources",
-      icon: <Link2 className="w-4 h-4" />,
+      title: "AI Takeaways",
+      url: "/dashboard/ai-takeaways",
+      icon: <Sparkles className="w-4 h-4" />,
+    },
+    {
+      title: "Agent Logs",
+      url: "/dashboard/agent-logs",
+      icon: <MessageCircle className="w-4 h-4" />,
     },
   ],
 
@@ -63,7 +69,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
     <Sidebar collapsible="offcanvas" {...props}>
       <SidebarHeader>
-        <NavBrand />
+        <div>InsightsAI</div>
       </SidebarHeader>
       <SidebarContent className="">
         <NavMain items={data.navMain} />

@@ -1,0 +1,46 @@
+import { cn } from "@/lib/utils";
+import { LetiKeyInsights } from "./components/leti-key-insights";
+import { KeyInsightsSummary } from "./components/key-insights-summary";
+import { TopInsightsSection } from "./components/top-insights-section";
+import { InsightCorrelations } from "./components/insight-correlations";
+import { EmergentInsightsCard } from "./components/emergent-insights-card";
+import { SentimentDistribution } from "../pix/components/sentiment-distribution";
+import { IntentionDistribution } from "../gro/components/intention-distribution";
+import { CommentsTable } from "@/components/comments/comments-table";
+import { DataCard } from "@/components/data/card";
+import { CommentsTableEnhanced } from "@/components/comments/comments-table-enhanced";
+
+interface LetiDashboardProps {
+  className?: string;
+}
+
+export const LetiDashboard: React.FC<LetiDashboardProps> = ({ className }) => {
+  return (
+    <div className={cn("space-y-6", className)}>
+      {/* AI Agent Key Insights - Top Section */}
+
+      {/* Key Insights Summary - Second Row */}
+      <KeyInsightsSummary />
+      <div className="grid grid-cols-2 gap-4">
+        <TopInsightsSection />
+        <SentimentDistribution />
+      </div>
+      <IntentionDistribution />
+      {/* Main Content Grid */}
+
+      {/*       <InsightCorrelations />
+      <div id="leti-key-insight">
+        <LetiKeyInsights />
+      </div> */}
+      <DataCard>
+        <DataCard.Header
+          title="Comments"
+          description="Comments from the AI Agent"
+        />
+        <div className="h-[500px] p-4">
+          <CommentsTableEnhanced />
+        </div>
+      </DataCard>
+    </div>
+  );
+};

@@ -8,5 +8,14 @@ export const Route = createFileRoute("/")({
 });
 
 function HomeComponent() {
-  return <LoginPage />;
+  const { data } = useQuery(
+    trpc.comments.list.queryOptions({
+      limit: 10,
+      offset: 0,
+    })
+  );
+
+  console.log(data);
+
+  return <div>Hello world</div>;
 }
