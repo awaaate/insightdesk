@@ -121,6 +121,7 @@ export const comment_insights = pgTable("comment_insights", {
   insight_id: integer("insight_id").references(() => insights.id),
   // LETI agent fields
   confidence: real("confidence"), // 0-10 confidence score
+  reasoning: text("reasoning"), // AI explanation of why this insight
   detected_by: text("detected_by"), // 'leti', 'manual', etc.
   // PIX agent fields - sentiment per insight
   sentiment_level_id: integer("sentiment_level_id").references(

@@ -1,15 +1,15 @@
 import { LetiDashboard } from "@/components/dashboard/leti/leti-dashboard";
 import { Chat } from "@/components/chat/chat";
 import { createFileRoute } from "@tanstack/react-router";
-import { 
-  MessageSquare, 
-  X, 
-  PanelRightClose, 
+import {
+  MessageSquare,
+  X,
+  PanelRightClose,
   PanelRightOpen,
   Sparkles,
   Brain,
   Maximize2,
-  Minimize2
+  Minimize2,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
@@ -80,8 +80,8 @@ function RouteComponent() {
           }}
         >
           {/* Main Content Panel */}
-          <ResizablePanel 
-            defaultSize={100 - chatSize} 
+          <ResizablePanel
+            defaultSize={100 - chatSize}
             minSize={50}
             className="relative"
           >
@@ -94,19 +94,21 @@ function RouteComponent() {
                       <Brain className="h-5 w-5 text-primary" />
                     </div>
                     <div>
-                      <h1 className="text-xl font-semibold">Intelligence Dashboard</h1>
+                      <h1 className="text-xl font-semibold">
+                        Intelligence Dashboard
+                      </h1>
                       <p className="text-sm text-muted-foreground">
-                        Pattern recognition and insight analysis
+                        Understanding your data, from comments to insights.
                       </p>
                     </div>
                   </div>
-                  
+
                   <div className="flex items-center gap-2">
                     <Badge variant="secondary" className="gap-1">
                       <Sparkles className="h-3 w-3" />
                       AI Enhanced
                     </Badge>
-                    
+
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Button
@@ -156,8 +158,8 @@ function RouteComponent() {
           </ResizablePanel>
 
           {/* Resizable Handle */}
-          <ResizableHandle 
-            withHandle 
+          <ResizableHandle
+            withHandle
             className="w-1 bg-border/50 hover:bg-border transition-colors data-[panel-group-direction=vertical]:h-1"
           />
 
@@ -185,13 +187,15 @@ function RouteComponent() {
                     )}
                   </div>
                   <div>
-                    <h2 className="text-base font-semibold">AI Assistant</h2>
+                    <h2 className="text-base font-semibold">
+                      InsightDesk Chatroom.
+                    </h2>
                     <p className="text-xs text-muted-foreground">
-                      Powered by advanced language models
+                      Ask the AI agents
                     </p>
                   </div>
                 </div>
-                
+
                 <div className="flex items-center gap-1">
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -227,19 +231,21 @@ function RouteComponent() {
                   <Brain className="h-5 w-5 text-primary" />
                 </div>
                 <div>
-                  <h1 className="text-xl font-semibold">Intelligence Dashboard</h1>
+                  <h1 className="text-xl font-semibold">
+                    Intelligence Dashboard
+                  </h1>
                   <p className="text-sm text-muted-foreground">
                     Pattern recognition and insight analysis
                   </p>
                 </div>
               </div>
-              
+
               <div className="flex items-center gap-2">
                 <Badge variant="secondary" className="gap-1">
                   <Sparkles className="h-3 w-3" />
                   AI Enhanced
                 </Badge>
-                
+
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button

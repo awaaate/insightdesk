@@ -342,7 +342,7 @@ export function CommentsTable({ onCommentSelect }: CommentsTableProps) {
                             )}
                           </div>
                           <p className="text-xs text-muted-foreground line-clamp-2">
-                            {insight.description}
+                            {insight.reasoning}
                           </p>
                         </div>
                       ))}

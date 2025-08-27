@@ -128,7 +128,7 @@ const InsightsList: React.FC<{
       {insights.length > 10 && (
         <div className="px-6 py-2 text-center border-t">
           <p className="text-xs text-muted-foreground">
-            Showing top 10 of {insights.length} patterns
+            Showing top 10 of {insights.length} insights
           </p>
         </div>
       )}
@@ -163,10 +163,7 @@ const InsightsChart: React.FC<{
   }, [chartData]);
 
   return (
-    <div className="flex-1 flex flex-col border-l">
-      <h3 className="text-muted-foreground/60 text-sm text-center mt-4">
-        Top 10 patterns by occurrence
-      </h3>
+    <div className="flex-1 flex h-full">
       <div className="flex-1 flex flex-col items-center justify-center">
         <DonutChart
           data={chartData}
@@ -256,7 +253,7 @@ export const TopInsightsSection: React.FC<TopInsightsSectionProps> = ({
       totalComments,
       topInsight,
       topPercentage,
-      totalPatterns: insights.length,
+      totalInsights: insights.length,
       maxComments: Math.max(...insights.map((i) => i.totalComments)),
     };
   }, [insights]);
@@ -267,7 +264,7 @@ export const TopInsightsSection: React.FC<TopInsightsSectionProps> = ({
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
-            Failed to load patterns. Please try refreshing the page.
+            Failed to load insights. Please try refreshing the page.
           </AlertDescription>
         </Alert>
       </DataCard>
@@ -306,7 +303,7 @@ export const TopInsightsSection: React.FC<TopInsightsSectionProps> = ({
         />
         <div className="text-center py-12 text-muted-foreground">
           <BarChart3 className="h-12 w-12 mx-auto mb-4 opacity-50" />
-          <p>No pattern data available</p>
+          <p>No insight data available</p>
         </div>
       </DataCard>
     );
@@ -324,9 +321,9 @@ export const TopInsightsSection: React.FC<TopInsightsSectionProps> = ({
       <div className="px-6 py-4 border-b bg-muted/30">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <span className="text-sm font-medium">Pattern Analysis</span>
+            <span className="text-sm font-medium">Insight Analysis</span>
             <Badge variant="outline" className="text-xs">
-              {analysis.totalPatterns} patterns •{" "}
+              {analysis.totalInsights} insights •{" "}
               {analysis.totalComments.toLocaleString()} total occurrences
             </Badge>
           </div>
@@ -344,9 +341,7 @@ export const TopInsightsSection: React.FC<TopInsightsSectionProps> = ({
       <div className="px-6 py-4">
         <Tabs defaultValue="pie">
           <TabsList className=" w-full flex ">
-            <TabsTrigger value="list" className="w-">
-              Insights
-            </TabsTrigger>
+            <TabsTrigger value="list">Insights</TabsTrigger>
             <TabsTrigger value="pie">Pie Chart</TabsTrigger>
           </TabsList>
           <TabsContent value="list">

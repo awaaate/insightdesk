@@ -1,9 +1,10 @@
 import { router, publicProcedure } from "@/lib/trpc";
 import { Queues } from "@/queues";
 import { SharedTypes } from "@/types/shared";
+import type { JobsOptions } from "bullmq";
 import { chunk } from "remeda";
 
-const BATCH_SIZE = 20; // Maximum comments per job
+const BATCH_SIZE = 5; // Maximum comments per job
 
 export const processingRouter = router({
   analyzeComments: publicProcedure
@@ -33,14 +34,15 @@ export const processingRouter = router({
               },
             } as Queues.AnalyzeComments.Types.JobData,
             opts: {
-              removeOnComplete: 100,
-              removeOnFail: 50,
+              removeOnComplete: 1000,
+              removeOnFail: 500,
+
               attempts: 3,
               backoff: {
                 type: "exponential" as const,
                 delay: 2000,
               },
-            },
+            } as JobsOptions,
           }));
 
           // Queue all jobs

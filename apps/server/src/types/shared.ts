@@ -82,7 +82,14 @@ export namespace SharedTypes {
         offset: z.number().min(0).default(0),
         filter: ExtendedFilterSchema.optional(),
         includeRelations: z.boolean().default(false),
-        sortBy: z.enum(["created_at", "updated_at", "sentiment_intensity", "confidence"]).default("created_at"),
+        sortBy: z
+          .enum([
+            "created_at",
+            "updated_at",
+            "sentiment_intensity",
+            "confidence",
+          ])
+          .default("created_at"),
         sortOrder: z.enum(["asc", "desc"]).default("desc"),
       });
 
@@ -103,33 +110,41 @@ export namespace SharedTypes {
 
       // Extended comment with full relations
       export const WithFullRelationsSchema = Schema.extend({
-        insights: z.array(z.object({
-          id: z.number(),
-          name: z.string(),
-          content: z.string(),
-          description: z.string(),
-          ai_generated: z.boolean(),
-          confidence: z.number().nullable(),
-          sentiment_level_id: z.number().nullable(),
-          sentiment_confidence: z.number().nullable(),
-          emotional_drivers: z.array(z.string()).nullable(),
-          sentiment_reasoning: z.string().nullable(),
-          sentiment_level: z.string().nullable(),
-          sentiment_name: z.string().nullable(),
-          sentiment_severity: z.string().nullable(),
-          sentiment_intensity: z.number().nullable(),
-        })).optional(),
-        intention: z.object({
-          id: z.number(),
-          type: z.string(),
-          name: z.string(),
-          description: z.string(),
-          primary_intention: z.string(),
-          secondary_intentions: z.array(z.string()).nullable(),
-          confidence: z.number(),
-          reasoning: z.string().nullable(),
-          context_factors: z.string().nullable(),
-        }).nullable().optional(),
+        insights: z
+          .array(
+            z.object({
+              id: z.number(),
+              name: z.string(),
+              content: z.string(),
+              description: z.string(),
+              ai_generated: z.boolean(),
+              confidence: z.number().nullable(),
+              reasoning: z.string().nullable(),
+              sentiment_level_id: z.number().nullable(),
+              sentiment_confidence: z.number().nullable(),
+              emotional_drivers: z.array(z.string()).nullable(),
+              sentiment_reasoning: z.string().nullable(),
+              sentiment_level: z.string().nullable(),
+              sentiment_name: z.string().nullable(),
+              sentiment_severity: z.string().nullable(),
+              sentiment_intensity: z.number().nullable(),
+            })
+          )
+          .optional(),
+        intention: z
+          .object({
+            id: z.number(),
+            type: z.string(),
+            name: z.string(),
+            description: z.string(),
+            primary_intention: z.string(),
+            secondary_intentions: z.array(z.string()).nullable(),
+            confidence: z.number(),
+            reasoning: z.string().nullable(),
+            context_factors: z.string().nullable(),
+          })
+          .nullable()
+          .optional(),
       });
 
       export type WithFullRelations = z.infer<typeof WithFullRelationsSchema>;
@@ -489,34 +504,44 @@ export namespace SharedTypes {
         pagination: PaginationSchema,
       });
 
-      export type ExtendedListResponse = z.infer<typeof ExtendedListResponseSchema>;
+      export type ExtendedListResponse = z.infer<
+        typeof ExtendedListResponseSchema
+      >;
 
       // Stats by sentiment response
       export const StatsBySentimentResponseSchema = z.object({
-        stats: z.array(z.object({
-          level: z.string(),
-          name: z.string(),
-          severity: z.string(),
-          intensity: z.number(),
-          count: z.number(),
-          avgConfidence: z.number().nullable(),
-        })),
+        stats: z.array(
+          z.object({
+            level: z.string(),
+            name: z.string(),
+            severity: z.string(),
+            intensity: z.number(),
+            count: z.number(),
+            avgConfidence: z.number().nullable(),
+          })
+        ),
       });
 
-      export type StatsBySentimentResponse = z.infer<typeof StatsBySentimentResponseSchema>;
+      export type StatsBySentimentResponse = z.infer<
+        typeof StatsBySentimentResponseSchema
+      >;
 
-      // Stats by intention response  
+      // Stats by intention response
       export const StatsByIntentionResponseSchema = z.object({
-        stats: z.array(z.object({
-          type: z.string(),
-          name: z.string(),
-          description: z.string(),
-          count: z.number(),
-          avgConfidence: z.number().nullable(),
-        })),
+        stats: z.array(
+          z.object({
+            type: z.string(),
+            name: z.string(),
+            description: z.string(),
+            count: z.number(),
+            avgConfidence: z.number().nullable(),
+          })
+        ),
       });
 
-      export type StatsByIntentionResponse = z.infer<typeof StatsByIntentionResponseSchema>;
+      export type StatsByIntentionResponse = z.infer<
+        typeof StatsByIntentionResponseSchema
+      >;
     }
 
     /**

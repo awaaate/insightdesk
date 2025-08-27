@@ -464,6 +464,7 @@ export namespace AnalyzeComments {
               comment_id: comment.id,
               insight_id: insightId,
               confidence: detected.confidence,
+              reasoning: detected.reasoning,
               detected_by: "leti",
             })
             .returning();
@@ -970,228 +971,234 @@ export namespace AnalyzeComments {
     return Queues.create.createWorker<
       typeof Queues.Names.ANALYZE_COMMENTS_BATCH,
       Types.JobData
-    >(Names.ANALYZE_COMMENTS_BATCH, async (job) => {
-      const startTime = Date.now();
-      const jobId = job.id ?? "unknown";
+    >(
+      Names.ANALYZE_COMMENTS_BATCH,
+      async (job) => {
+        const startTime = Date.now();
+        const jobId = job.id ?? "unknown";
 
-      // Emit job started
-      await Bus.publish(Events.jobStarted, {
-        jobId,
-        commentIds: job.data.commentIds,
-        timestamp: new Date().toISOString(),
-      });
+        // Emit job started
+        await Bus.publish(Events.jobStarted, {
+          jobId,
+          commentIds: job.data.commentIds,
+          timestamp: new Date().toISOString(),
+        });
 
-      // Update state: initializing
-      await Bus.publish(Events.stateChanged, {
-        jobId,
-        state: "initializing",
-        progress: 0,
-        timestamp: new Date().toISOString(),
-        commentIds: job.data.commentIds,
-      });
+        // Update state: initializing
+        await Bus.publish(Events.stateChanged, {
+          jobId,
+          state: "initializing",
+          progress: 0,
+          timestamp: new Date().toISOString(),
+          commentIds: job.data.commentIds,
+        });
 
-      try {
-        const result = await DB.executeTransaction(async (tx) => {
-          // Phase 1: Fetch data
+        try {
+          const result = await DB.executeTransaction(async (tx) => {
+            // Phase 1: Fetch data
+            await Bus.publish(Events.stateChanged, {
+              jobId,
+              state: "fetching_data",
+              progress: 10,
+              timestamp: new Date().toISOString(),
+              commentIds: job.data.commentIds,
+            });
+
+            const data = await Processing.fetchData(tx, job.data.commentIds);
+
+            // Phase 2: LETI - Detect insights
+            await Bus.publish(Events.stateChanged, {
+              jobId,
+              state: "analyzing",
+              progress: 20,
+              timestamp: new Date().toISOString(),
+              commentIds: job.data.commentIds,
+              currentCommentIndex: 0,
+              totalComments: data.comments.length,
+            });
+
+            await Bus.publish(Events.letiStarted, {
+              commentCount: data.comments.length,
+              existingInsightCount: data.insights.length,
+              timestamp: new Date().toISOString(),
+            });
+
+            const letiResults = await Processing.detectInsights(tx, data, {
+              jobId,
+            });
+
+            // Phase 3: GRO - Detect intentions
+            await Bus.publish(Events.stateChanged, {
+              jobId,
+              state: "analyzing",
+              progress: 50,
+              timestamp: new Date().toISOString(),
+              commentIds: job.data.commentIds,
+              currentCommentIndex: 0,
+              totalComments: data.comments.length,
+            });
+
+            await Bus.publish(Events.groStarted, {
+              commentCount: data.comments.length,
+              timestamp: new Date().toISOString(),
+            });
+
+            const groResults = await Processing.detectIntentions(
+              tx,
+              data.comments,
+              { jobId }
+            );
+
+            // Phase 4: PIX - Analyze sentiment
+            await Bus.publish(Events.stateChanged, {
+              jobId,
+              state: "analyzing",
+              progress: 75,
+              timestamp: new Date().toISOString(),
+              commentIds: job.data.commentIds,
+              currentCommentIndex: 0,
+              totalComments: data.comments.length,
+            });
+
+            await Bus.publish(Events.pixStarted, {
+              pairsToAnalyze: letiResults.commentInsightIds.length,
+              timestamp: new Date().toISOString(),
+            });
+
+            const pixResults = await Processing.analyzeSentiment(
+              tx,
+              data.comments,
+              letiResults.commentInsightIds,
+              data.sentimentLevels,
+              { jobId }
+            );
+
+            // Compile final results
+            const processingResult: Types.ProcessingResult = {
+              processedComments: data.comments.length,
+              matchedInsights:
+                letiResults.totalDetected - letiResults.newInsightsCreated,
+              createdInsights: letiResults.newInsightsCreated,
+              detectedInsights: letiResults.totalDetected,
+              newInsightsCreated: letiResults.newInsightsCreated,
+              intentionsDetected: groResults.commentIntentionIds.length,
+              sentimentsAnalyzed: pixResults.sentimentsAnalyzed,
+              commentInsightIds: letiResults.commentInsightIds,
+              commentIntentionIds: groResults.commentIntentionIds,
+            };
+
+            return processingResult;
+          });
+
+          // Job completed successfully
           await Bus.publish(Events.stateChanged, {
             jobId,
-            state: "fetching_data",
-            progress: 10,
-            timestamp: new Date().toISOString(),
+            state: "completed",
+            progress: 100,
             commentIds: job.data.commentIds,
+            details: {
+              processedComments: result.processedComments,
+              matchedInsights: result.matchedInsights,
+              createdInsights: result.createdInsights,
+              relationships: result.commentInsightIds.map(() => ({
+                commentId: "", // Would need to fetch if needed
+                insightId: 0, // Would need to fetch if needed
+                isNew: false,
+              })),
+            },
+            timestamp: new Date().toISOString(),
           });
 
-          const data = await Processing.fetchData(tx, job.data.commentIds);
-
-          // Phase 2: LETI - Detect insights
-          await Bus.publish(Events.stateChanged, {
+          await Bus.publish(Events.jobCompleted, {
             jobId,
-            state: "analyzing",
-            progress: 20,
-            timestamp: new Date().toISOString(),
-            commentIds: job.data.commentIds,
-            currentCommentIndex: 0,
-            totalComments: data.comments.length,
-          });
-
-          await Bus.publish(Events.letiStarted, {
-            commentCount: data.comments.length,
-            existingInsightCount: data.insights.length,
+            result: {
+              processedComments: result.processedComments,
+              matchedInsights: result.matchedInsights,
+              createdInsights: result.createdInsights,
+            },
+            duration: Date.now() - startTime,
             timestamp: new Date().toISOString(),
           });
 
-          const letiResults = await Processing.detectInsights(tx, data, {
-            jobId,
-          });
-
-          // Phase 3: GRO - Detect intentions
-          await Bus.publish(Events.stateChanged, {
-            jobId,
-            state: "analyzing",
-            progress: 50,
-            timestamp: new Date().toISOString(),
-            commentIds: job.data.commentIds,
-            currentCommentIndex: 0,
-            totalComments: data.comments.length,
-          });
-
-          await Bus.publish(Events.groStarted, {
-            commentCount: data.comments.length,
-            timestamp: new Date().toISOString(),
-          });
-
-          const groResults = await Processing.detectIntentions(
-            tx,
-            data.comments,
-            { jobId }
+          logger.info(
+            {
+              jobId,
+              ...result,
+              duration: Date.now() - startTime,
+            },
+            "Comment analysis completed"
           );
 
-          // Phase 4: PIX - Analyze sentiment
-          await Bus.publish(Events.stateChanged, {
-            jobId,
-            state: "analyzing",
-            progress: 75,
-            timestamp: new Date().toISOString(),
+          return result;
+        } catch (error) {
+          const errorContext: Record<string, any> = {
+            jobData: job.data,
             commentIds: job.data.commentIds,
-            currentCommentIndex: 0,
-            totalComments: data.comments.length,
-          });
-
-          await Bus.publish(Events.pixStarted, {
-            pairsToAnalyze: letiResults.commentInsightIds.length,
-            timestamp: new Date().toISOString(),
-          });
-
-          const pixResults = await Processing.analyzeSentiment(
-            tx,
-            data.comments,
-            letiResults.commentInsightIds,
-            data.sentimentLevels,
-            { jobId }
-          );
-
-          // Compile final results
-          const processingResult: Types.ProcessingResult = {
-            processedComments: data.comments.length,
-            matchedInsights:
-              letiResults.totalDetected - letiResults.newInsightsCreated,
-            createdInsights: letiResults.newInsightsCreated,
-            detectedInsights: letiResults.totalDetected,
-            newInsightsCreated: letiResults.newInsightsCreated,
-            intentionsDetected: groResults.commentIntentionIds.length,
-            sentimentsAnalyzed: pixResults.sentimentsAnalyzed,
-            commentInsightIds: letiResults.commentInsightIds,
-            commentIntentionIds: groResults.commentIntentionIds,
+            commentCount: job.data.commentIds.length,
           };
 
-          return processingResult;
-        });
+          // Add specific error context
+          if (Errors.AnalysisError.isInstance(error)) {
+            errorContext.analysisPhase = error.data.phase;
+            errorContext.agent = error.data.agent;
+            errorContext.provider = error.data.provider;
+          }
 
-        // Job completed successfully
-        await Bus.publish(Events.stateChanged, {
-          jobId,
-          state: "completed",
-          progress: 100,
-          commentIds: job.data.commentIds,
-          details: {
-            processedComments: result.processedComments,
-            matchedInsights: result.matchedInsights,
-            createdInsights: result.createdInsights,
-            relationships: result.commentInsightIds.map(() => ({
-              commentId: "", // Would need to fetch if needed
-              insightId: 0, // Would need to fetch if needed
-              isNew: false,
-            })),
-          },
-          timestamp: new Date().toISOString(),
-        });
-
-        await Bus.publish(Events.jobCompleted, {
-          jobId,
-          result: {
-            processedComments: result.processedComments,
-            matchedInsights: result.matchedInsights,
-            createdInsights: result.createdInsights,
-          },
-          duration: Date.now() - startTime,
-          timestamp: new Date().toISOString(),
-        });
-
-        logger.info(
-          {
+          // Process error
+          const errorResult = WorkerErrors.processWorkerError(
+            error,
             jobId,
-            ...result,
-            duration: Date.now() - startTime,
-          },
-          "Comment analysis completed"
-        );
+            errorContext,
+            startTime
+          );
 
-        return result;
-      } catch (error) {
-        const errorContext: Record<string, any> = {
-          jobData: job.data,
-          commentIds: job.data.commentIds,
-          commentCount: job.data.commentIds.length,
-        };
+          // Publish error events
+          await Bus.publish(Events.jobFailed, {
+            jobId,
+            error: errorResult.summary,
+            errorType: errorResult.error.name,
+            timestamp: new Date().toISOString(),
+            errorContext: errorResult.context,
+            originalError: errorResult,
+          });
 
-        // Add specific error context
-        if (Errors.AnalysisError.isInstance(error)) {
-          errorContext.analysisPhase = error.data.phase;
-          errorContext.agent = error.data.agent;
-          errorContext.provider = error.data.provider;
-        }
-
-        // Process error
-        const errorResult = WorkerErrors.processWorkerError(
-          error,
-          jobId,
-          errorContext,
-          startTime
-        );
-
-        // Publish error events
-        await Bus.publish(Events.jobFailed, {
-          jobId,
-          error: errorResult.summary,
-          errorType: errorResult.error.name,
-          timestamp: new Date().toISOString(),
-          errorContext: errorResult.context,
-          originalError: errorResult,
-        });
-
-        await Bus.publish(Events.stateChanged, {
-          jobId,
-          state: "failed",
-          progress: 0,
-          commentIds: job.data.commentIds,
-          details: {
-            error: {
-              name: errorResult.error.name,
-              message: errorResult.error.message,
-              stack: errorResult.error.stack,
+          await Bus.publish(Events.stateChanged, {
+            jobId,
+            state: "failed",
+            progress: 0,
+            commentIds: job.data.commentIds,
+            details: {
+              error: {
+                name: errorResult.error.name,
+                message: errorResult.error.message,
+                stack: errorResult.error.stack,
+              },
+              chain: errorResult.chain.map((c) => c.message),
+              summary: errorResult.summary,
             },
-            chain: errorResult.chain.map((c) => c.message),
-            summary: errorResult.summary,
-          },
-          timestamp: new Date().toISOString(),
-        });
+            timestamp: new Date().toISOString(),
+          });
 
-        logger.error(
-          {
+          logger.error(
+            {
+              jobId,
+              errorResult,
+              duration: errorResult.duration,
+            },
+            `Comment analysis job failed: ${errorResult.summary}`
+          );
+
+          throw WorkerErrors.prepareErrorForThrow(
+            error,
             jobId,
-            errorResult,
-            duration: errorResult.duration,
-          },
-          `Comment analysis job failed: ${errorResult.summary}`
-        );
-
-        throw WorkerErrors.prepareErrorForThrow(
-          error,
-          jobId,
-          errorContext,
-          startTime
-        );
+            errorContext,
+            startTime
+          );
+        }
+      },
+      {
+        concurrency: 20,
       }
-    });
+    );
   }
 }

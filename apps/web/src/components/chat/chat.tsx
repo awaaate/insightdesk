@@ -73,22 +73,22 @@ import { Separator } from "@/components/ui/separator";
 const suggestedPrompts = [
   {
     icon: <Brain className="h-3 w-3" />,
-    text: "Analyze recent patterns",
+    text: "Dame insights inesperados",
     category: "analysis",
   },
   {
     icon: <Zap className="h-3 w-3" />,
-    text: "Generate insights report",
+    text: "Comentarios sorprendentes",
     category: "report",
   },
   {
     icon: <Hash className="h-3 w-3" />,
-    text: "Show key metrics",
+    text: "Veamos métricas clave",
     category: "metrics",
   },
   {
     icon: <AlertCircle className="h-3 w-3" />,
-    text: "Identify anomalies",
+    text: "Correlaciones interesantes",
     category: "alert",
   },
 ];
@@ -133,29 +133,38 @@ export const Chat = () => {
         <div className="py-4 space-y-4">
           {showWelcome ? (
             <div className="flex flex-col items-center justify-center h-full min-h-[400px] text-center">
-              <div className="p-3 rounded-2xl bg-primary/10 mb-4">
-                <Brain className="h-8 w-8 text-primary" />
-              </div>
-              <h3 className="text-lg font-semibold mb-2">AI Assistant Ready</h3>
-              <p className="text-sm text-muted-foreground mb-6 max-w-sm">
-                I can help you analyze data, generate insights, and answer
-                questions about your dashboard.
-              </p>
+              <img
+                src={`${
+                  import.meta.env.VITE_SERVER_URL
+                }/assets/mascota-colgada.webp`}
+                alt="Leti mascot"
+                className="h-24 w-24 text-primary -mb-6 relative z-10"
+              />
+              <div className="flex flex-col items-center justify-center bg-card p-4 py-8 rounded-xl shadow-lg border">
+                <h3 className="text-lg font-semibold mb-2">
+                  ¡ Tus Agentes de lA listos para charlar !
+                </h3>
+                <p className="text-sm text-muted-foreground mb-6 max-w-sm">
+                  Pregunta lo que quieras. Te ayudo con los datos de
+                  InsightDESK, sacar conclusiones, análisis de insights del
+                  dashboard.
+                </p>
 
-              {/* Suggested Prompts */}
-              <div className="grid grid-cols-2 gap-2 w-full max-w-md">
-                {suggestedPrompts.map((prompt, i) => (
-                  <Button
-                    key={i}
-                    variant="outline"
-                    size="sm"
-                    className="justify-start gap-2 text-xs h-auto py-2 px-3 hover:bg-primary/10 transition-colors"
-                    onClick={() => handleSuggestedPrompt(prompt.text)}
-                  >
-                    {prompt.icon}
-                    <span className="text-left">{prompt.text}</span>
-                  </Button>
-                ))}
+                {/* Suggested Prompts */}
+                <div className="grid grid-cols-2 gap-2 w-full max-w-md">
+                  {suggestedPrompts.map((prompt, i) => (
+                    <Button
+                      key={i}
+                      variant="outline"
+                      size="sm"
+                      className="justify-start gap-2 text-xs h-auto py-2 px-3 hover:bg-primary/10 transition-colors"
+                      onClick={() => handleSuggestedPrompt(prompt.text)}
+                    >
+                      {prompt.icon}
+                      <span className="text-left">{prompt.text}</span>
+                    </Button>
+                  ))}
+                </div>
               </div>
             </div>
           ) : (

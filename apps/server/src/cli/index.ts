@@ -9,6 +9,7 @@ import Table from "cli-table3";
 import { readFile } from "fs/promises";
 import { existsSync } from "fs";
 import type { SharedTypes } from "@/types/shared";
+import * as XLSX from "xlsx";
 
 // WebSocket client for real-time updates
 class WebSocketClient {
@@ -78,7 +79,7 @@ class WebSocketClient {
 
   on<
     T extends SharedTypes.WebSocket.EventType,
-    M extends SharedTypes.WebSocket.EventMap[T],
+    M extends SharedTypes.WebSocket.EventMap[T]
   >(eventType: T, handler: (data: M["data"]) => void) {
     this.messageHandlers.set(eventType, handler);
   }
@@ -143,6 +144,7 @@ async function createComments() {
     choices: [
       { title: "📝 Entrada manual", value: "manual" },
       { title: "📁 Importar desde archivo .txt", value: "import" },
+      { title: "📊 Importar desde Excel/CSV", value: "excel" },
       { title: "📋 Pegar múltiples líneas", value: "paste" },
     ],
   });
@@ -227,6 +229,110 @@ async function createComments() {
       break;
     }
 
+    case "excel": {
+      const { filepath } = await prompts({
+        type: "text",
+        name: "filepath",
+        message: "Ruta del archivo Excel/CSV (.xlsx, .xls, .csv):",
+      });
+
+      if (!filepath) return null;
+
+      if (!existsSync(filepath)) {
+        console.log(chalk.red("❌ El archivo no existe"));
+        return null;
+      }
+
+      // Detectar la extensión del archivo
+      const extension = filepath.toLowerCase().split(".").pop();
+      if (!["xlsx", "xls", "csv"].includes(extension || "")) {
+        console.log(
+          chalk.red("❌ Formato no soportado. Usa .xlsx, .xls o .csv")
+        );
+        return null;
+      }
+
+      const spinner = ora("Leyendo archivo Excel/CSV...").start();
+      try {
+        // Leer el archivo con XLSX
+        const workbook = XLSX.readFile(filepath);
+        console.log(workbook);
+
+        // Obtener la primera hoja
+        const firstSheetName = workbook.SheetNames[0];
+        if (!firstSheetName) {
+          spinner.fail("El archivo no contiene hojas");
+          return null;
+        }
+
+        const worksheet = workbook.Sheets[firstSheetName];
+
+        // Convertir a JSON (array de arrays)
+        const data = XLSX.utils.sheet_to_json(worksheet, {
+          header: 1, // Usar array en lugar de objetos
+          defval: "", // Valor por defecto para celdas vacías
+        }) as string[][];
+
+        // Extraer comentarios de la primera columna (ignorando encabezados si los hay)
+        const { hasHeader } = await prompts({
+          type: "confirm",
+          name: "hasHeader",
+          message: "¿La primera fila contiene encabezados?",
+          initial: true,
+        });
+
+        const startRow = hasHeader ? 1 : 0;
+        comments = data
+          .slice(startRow)
+          .map((row) => String(row[0] || "").trim())
+          .filter((comment) => comment.length > 0);
+
+        if (comments.length === 0) {
+          spinner.fail("No se encontraron comentarios en el archivo");
+          return null;
+        }
+
+        spinner.succeed(
+          `Cargados ${comments.length} comentarios del archivo Excel/CSV`
+        );
+
+        // Mostrar preview
+        console.log(chalk.blue("\n📄 Vista previa:"));
+        const preview = comments.slice(0, 5);
+        preview.forEach((comment, i) => {
+          const truncated =
+            comment.length > 80 ? comment.substring(0, 77) + "..." : comment;
+          console.log(chalk.gray(`  ${i + 1}. ${truncated}`));
+        });
+        if (comments.length > 5) {
+          console.log(chalk.gray(`  ... y ${comments.length - 5} más`));
+        }
+
+        // Si hay múltiples columnas, mostrar información adicional
+        if (data.length > 0 && data[0].length > 1) {
+          console.log(
+            chalk.yellow(
+              `\n⚠ Nota: Se detectaron ${data[0].length} columnas. Solo se importará la primera columna.`
+            )
+          );
+        }
+
+        const { confirm } = await prompts({
+          type: "confirm",
+          name: "confirm",
+          message: "Proceder con estos comentarios?",
+          initial: true,
+        });
+
+        if (!confirm) return null;
+      } catch (error) {
+        spinner.fail("Error al leer el archivo Excel/CSV");
+        console.error(error);
+        return null;
+      }
+      break;
+    }
+
     case "paste": {
       console.log(
         chalk.cyan(
@@ -281,7 +387,7 @@ async function createComments() {
     console.log("\n" + table.toString());
 
     return {
-      commentIds: result.commentIds,
+      commentIds: result.comments.map((comment) => comment.commentId),
       comments: result.comments,
     };
   } catch (error) {
@@ -391,7 +497,9 @@ async function processAndMonitor(commentIds: string[]) {
       const icon = data.isEmergent ? "✨" : "🔗";
       console.log(
         chalk.blue(
-          `${icon} Insight detectado: ${chalk.white(data.insightName)} (confianza: ${data.confidence})`
+          `${icon} Insight detectado: ${chalk.white(
+            data.insightName
+          )} (confianza: ${data.confidence})`
         )
       );
     });
@@ -721,10 +829,10 @@ async function realtimeMonitor() {
         data.state === "analyzing"
           ? "🔄 Analizando"
           : data.state === "completed"
-            ? "✅ Completado"
-            : data.state === "failed"
-              ? "❌ Fallido"
-              : "⏳ En espera";
+          ? "✅ Completado"
+          : data.state === "failed"
+          ? "❌ Fallido"
+          : "⏳ En espera";
       addEvent(`${stateMsg}: ${data.jobId} (${data.progress || 0}%)`);
     });
 

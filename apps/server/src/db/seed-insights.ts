@@ -1,5 +1,6 @@
 import { uniqueBy } from "remeda";
 import { DB } from ".";
+import { sql } from "drizzle-orm";
 
 export const insightsDb = [
   {
@@ -2200,8 +2201,26 @@ export const insightsDb = [
   },
 ];
 
+async function clearDb(): Promise<void> {
+  const query = sql<string>`SELECT table_name
+      FROM information_schema.tables
+      WHERE table_schema = 'public'
+        AND table_type = 'BASE TABLE';
+    `;
+
+  const tables = await DB.client.execute(query); // retrieve tables
+
+  for (const table of tables.rows) {
+    const query = sql.raw(`TRUNCATE TABLE ${table.table_name} CASCADE;`);
+    await DB.client.execute(query); // Truncate (clear all the data) the table
+  }
+}
+
 async function seedInsights() {
   console.log("🌱 Seeding insights table...");
+
+  //clean databse
+  //await clearDb();
 
   try {
     await DB.executeTransaction(async (tx) => {
