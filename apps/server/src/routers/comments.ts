@@ -1,7 +1,7 @@
 import { router, publicProcedure } from "@/lib/trpc";
 import { DB } from "@/db";
 import { SharedTypes } from "@/types/shared";
-import { desc, eq, and, gte, lte, inArray, sql, isNotNull } from "drizzle-orm";
+import { desc, eq, and, gte, lte, inArray, sql, isNotNull, ilike } from "drizzle-orm";
 import { z } from "zod";
 
 export const commentsRouter = router({
@@ -119,6 +119,13 @@ export const commentsRouter = router({
         const conditions = [];
 
         if (filter) {
+          // Text search filter
+          if (filter.searchText && filter.searchText.trim() !== '') {
+            conditions.push(
+              ilike(DB.schema.comments.content, `%${filter.searchText.trim()}%`)
+            );
+          }
+
           // Date filters
           if (filter.startDate) {
             conditions.push(

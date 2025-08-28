@@ -135,7 +135,7 @@ app.post("/api/chat", async (c) => {
     await c.req.json();
 
     if (!chatSystemPrompt) {
-      const promptPath = join(process.cwd(), "prompts", "chat-system-prompt.txt");
+      const promptPath = join(process.cwd(), "src/prompts", "chat-system-prompt.txt");
       chatSystemPrompt = await readFile(promptPath, "utf-8");
       visualLogger.log("info", "Chat system prompt loaded");
     }

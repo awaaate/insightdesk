@@ -17,7 +17,7 @@ export namespace AnalyzeComments {
   export const QUEUE_NAME = Names.ANALYZE_COMMENTS_BATCH;
 
   export const DEFAULT_PROVIDER = "openai";
-  export const DEFAULT_PERFORMANCE = "low";
+  export const DEFAULT_PERFORMANCE = "high";
 
   /**
    * Input/Output Types

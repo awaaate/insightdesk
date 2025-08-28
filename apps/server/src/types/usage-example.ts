@@ -381,34 +381,34 @@ function useTypedWebSocket(url: string) {
   };
 }
 
-// Usage in React component
-function JobProgressComponent({ jobIds }: { jobIds: string[] }) {
-  const { lastMessage, subscribeToJobs } = useTypedWebSocket("ws://localhost:3000/ws");
-  const [jobStates, setJobStates] = useState<Map<string, SharedTypes.Domain.Job.State>>(new Map());
+// Usage in React component (commented out for backend)
+// function JobProgressComponent({ jobIds }: { jobIds: string[] }) {
+//   const { lastMessage, subscribeToJobs } = useTypedWebSocket("ws://localhost:3000/ws");
+//   const [jobStates, setJobStates] = useState<Map<string, SharedTypes.Domain.Job.State>>(new Map());
 
-  useEffect(() => {
-    subscribeToJobs(jobIds);
-  }, [jobIds, subscribeToJobs]);
+//   useEffect(() => {
+//     subscribeToJobs(jobIds);
+//   }, [jobIds, subscribeToJobs]);
 
-  useEffect(() => {
-    if (lastMessage && SharedTypes.Utils.isStateChangedMessage(lastMessage)) {
-      setJobStates(prev => {
-        const updated = new Map(prev);
-        updated.set(lastMessage.data.jobId, lastMessage.data.state);
-        return updated;
-      });
-    }
-  }, [lastMessage]);
+//   useEffect(() => {
+//     if (lastMessage && SharedTypes.Utils.isStateChangedMessage(lastMessage)) {
+//       setJobStates(prev => {
+//         const updated = new Map(prev);
+//         updated.set(lastMessage.data.jobId, lastMessage.data.state);
+//         return updated;
+//       });
+//     }
+//   }, [lastMessage]);
 
-  return (
-    <div>
-      {Array.from(jobStates.entries()).map(([jobId, state]) => (
-        <div key={jobId}>
-          Job {jobId}: {state}
-        </div>
-      ))}
-    </div>
-  );
-}
+//   return (
+//     <div>
+//       {Array.from(jobStates.entries()).map(([jobId, state]) => (
+//         <div key={jobId}>
+//           Job {jobId}: {state}
+//         </div>
+//       ))}
+//     </div>
+//   );
+// }
 
 export {}; // Make this a module

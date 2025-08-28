@@ -47,6 +47,7 @@ export namespace SharedTypes {
         // Basic filters
         source: z.string().optional(), // From comments table
         businessUnit: z.string().optional(), // From insights table via JOIN
+        searchText: z.string().optional(), // Text search in comment content
         // Date range filters
         startDate: z.date().or(z.string().datetime()).optional(),
         endDate: z.date().or(z.string().datetime()).optional(),

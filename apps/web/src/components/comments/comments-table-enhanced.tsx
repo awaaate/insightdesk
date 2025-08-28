@@ -235,6 +235,7 @@ export function CommentsTableEnhanced({
       limit: pageSize,
       offset: (currentPage - 1) * pageSize,
       filter: {
+        searchText: debouncedSearch || undefined,
         startDate: dateRange.from,
         endDate: dateRange.to,
         sentimentLevels:
@@ -249,6 +250,7 @@ export function CommentsTableEnhanced({
     [
       currentPage,
       pageSize,
+      debouncedSearch,
       dateRange,
       selectedSentiments,
       selectedIntention,
