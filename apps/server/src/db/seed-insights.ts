@@ -2220,7 +2220,7 @@ async function seedInsights() {
   console.log("🌱 Seeding insights table...");
 
   //clean databse
-  //await clearDb();
+//  await clearDb();
 
   try {
     await DB.executeTransaction(async (tx) => {

@@ -9,6 +9,7 @@ import { IntentionDistribution } from "../gro/components/intention-distribution"
 import { CommentsTable } from "@/components/comments/comments-table";
 import { DataCard } from "@/components/data/card";
 import { CommentsTableEnhanced } from "@/components/comments/comments-table-enhanced";
+import { AIAgentsBrainBar } from "./components/ai-agents-brainbar";
 
 interface LetiDashboardProps {
   className?: string;
@@ -26,6 +27,10 @@ export const LetiDashboard: React.FC<LetiDashboardProps> = ({ className }) => {
         <SentimentDistribution />
       </div>
       <IntentionDistribution />
+      
+      {/* AI Agents Brain-bar - Analysis insights from specialized agents */}
+      <AIAgentsBrainBar />
+      
       {/* Main Content Grid */}
 
       {/*       <InsightCorrelations />

@@ -202,7 +202,7 @@ export function CommentsTableEnhanced({
   // State management
   const [searchInput, setSearchInput] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
+  const [pageSize, setPageSize] = useState(5);
   const [sortBy, setSortBy] = useState<"created_at" | "updated_at">(
     "created_at"
   );
@@ -954,6 +954,7 @@ export function CommentsTableEnhanced({
               <SelectItem value="web">NPS</SelectItem>
               <SelectItem value="social">App Store</SelectItem>
               <SelectItem value="review">Scouting</SelectItem>
+              <SelectItem value="nps-relacional">NPS-relacional</SelectItem>
             </SelectContent>
           </Select>
 

@@ -18,8 +18,13 @@ import { serveStatic } from "@hono/node-server/serve-static";
 import { streamText, convertToModelMessages } from "ai";
 import type { UIMessage } from "ai";
 import { AI } from "./ai";
+import { readFile } from "fs/promises";
+import { join } from "path";
+
 
 const app = new Hono({ strict: false });
+
+let chatSystemPrompt = "";
 
 // Setup Bull Board with all queues
 const serverAdapter = new HonoAdapter(serveStatic);
@@ -120,6 +125,7 @@ app.get("/", (c) => {
   return c.redirect("/api");
 });
 
+
 app.post("/api/chat", async (c) => {
   const {
     messages,
@@ -128,12 +134,18 @@ app.post("/api/chat", async (c) => {
   }: { messages: UIMessage[]; model: string; webSearch: boolean } =
     await c.req.json();
 
+    if (!chatSystemPrompt) {
+      const promptPath = join(process.cwd(), "prompts", "chat-system-prompt.txt");
+      chatSystemPrompt = await readFile(promptPath, "utf-8");
+      visualLogger.log("info", "Chat system prompt loaded");
+    }
+
+
   return AI.streamText({
     messages,
     provider: "openai",
     performance: "medium",
-    system:
-      "You are a helpful assistant that can answer questions and help with tasks",
+    system: chatSystemPrompt,
   });
 });
 

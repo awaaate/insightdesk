@@ -174,9 +174,9 @@ export const KeyInsightsSummary: React.FC<KeyInsightsSummaryProps> = ({
           </div>
           <div className="flex items-center justify-between gap-2">
             <div>
-              <p className="text-3xl font-bold">{keyMetrics.topInsight.name}</p>
+              <p className="text-1xl font-bold">{`"${keyMetrics.topInsight.name}"`}</p>
               <p className="text-sm text-muted-foreground">
-                {keyMetrics.topInsight.totalComments} occurrences
+                {keyMetrics.topInsight.totalComments} occurrences 
               </p>
             </div>
             <div className="text-sm w-min aspect-square p-0.5 mx-2 border flex items-center justify-center bg-brand/20 text-brand rounded-full">

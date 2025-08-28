@@ -424,6 +424,9 @@ export const SentimentDistribution: React.FC<SentimentDistributionProps> = ({
       </div>
 
       {/* Main Content - Split Layout */}
+
+      <div className="px-6 py-4">
+
       <Tabs defaultValue="list">
         <TabsList className="w-full flex">
           <TabsTrigger value="list">List</TabsTrigger>
@@ -436,6 +439,7 @@ export const SentimentDistribution: React.FC<SentimentDistributionProps> = ({
           <SentimentDistributionPie data={data.raw.sentimentDistribution} />
         </TabsContent>
       </Tabs>
+      </div>
 
       {/* Footer */}
       <div className="px-6 py-3 border-t">

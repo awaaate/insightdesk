@@ -47,7 +47,7 @@ export function SiteHeader() {
                 InsightDesk
                 <span className="ml-1 text-xs font-normal text-primary">.ai</span>
               </h1>
-              <p className="text-xs text-muted-foreground">Intelligence Platform</p>
+              <p className="text-xs text-muted-foreground">From feedback to strategic clarity.</p>
             </div>
           </div>
         </div>

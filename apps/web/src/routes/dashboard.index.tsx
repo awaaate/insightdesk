@@ -104,9 +104,9 @@ function RouteComponent() {
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <Badge variant="secondary" className="gap-1">
+                    <Badge variant="secondary" className="gap-1 text-xs">
                       <Sparkles className="h-3 w-3" />
-                      AI Enhanced
+                      Generado mediante sistemas de IA Multi-Agente y tecnología NLP
                     </Badge>
 
                     <Tooltip>
@@ -232,18 +232,18 @@ function RouteComponent() {
                 </div>
                 <div>
                   <h1 className="text-xl font-semibold">
-                    Intelligence Dashboard
+                    Insight Intelligent Dashboard
                   </h1>
                   <p className="text-sm text-muted-foreground">
-                    Pattern recognition and insight analysis
+                    Análisis avanzado de comentarios, insights y NPS.
                   </p>
                 </div>
               </div>
 
               <div className="flex items-center gap-2">
-                <Badge variant="secondary" className="gap-1">
+                <Badge variant="secondary" className="gap-1 text-xs text-brand/70  bg-background border-brand/20">
                   <Sparkles className="h-3 w-3" />
-                  AI Enhanced
+                  Generado mediante sistemas de IA Multi-Agente y tecnología NLP
                 </Badge>
 
                 <Tooltip>

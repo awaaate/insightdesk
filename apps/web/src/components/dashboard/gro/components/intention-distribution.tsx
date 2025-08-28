@@ -15,7 +15,6 @@ import {
   BarChart3,
   AlertCircle,
   HelpCircle,
-  TrendingUp,
   Activity,
   AlertTriangle,
 } from "lucide-react";
@@ -23,16 +22,16 @@ import { useMemo } from "react";
 import {
   GRO_METRICS,
   INTENTION_TYPES,
-  INTENTION_PRIORITY,
   getIntentionByType,
 } from "../helpers/gro-constants";
-import { DonutChart } from "@/components/data/donut-chart";
-import {
-  AvailableChartColors,
-  constructCategoryColors,
-  getColorClassName,
-} from "@/lib/chartUtils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { RadialBar, RadialBarChart, PolarAngleAxis, PolarRadiusAxis } from "recharts";
+import {
+  ChartConfig,
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+} from "@/components/ui/chart";
 
 interface IntentionDistributionProps {
   className?: string;
@@ -208,93 +207,166 @@ export const IntentionLevelsList: React.FC<{
   );
 };
 
-// Component for the type distribution pie chart
+// Component for the type distribution radial chart
 const IntentionTypePie: React.FC<{
   data: any;
 }> = ({ data }) => {
   const chartData = useMemo(() => {
     if (!data?.pieChart) return [];
 
-    return data.pieChart.labels.map((label: string, index: number) => ({
-      name: label,
-      value: data.pieChart.datasets[0].data[index],
-      percentage: data.pieChart.datasets[0].percentages[index],
-    }));
+    // Get top 5 intentions by count and aggregate the rest as "Other"
+    const sortedData = data.pieChart.labels
+      .map((label: string, index: number) => ({
+        name: label,
+        value: data.pieChart.datasets[0].data[index],
+        percentage: data.pieChart.datasets[0].percentages[index],
+      }))
+      .sort((a: any, b: any) => b.value - a.value);
+
+    // Take top 5 and add others if needed
+    const top5 = sortedData.slice(0, 5);
+    const otherSum = sortedData.slice(5).reduce((sum: number, item: any) => sum + item.value, 0);
+    
+    if (otherSum > 0) {
+      const totalValue = sortedData.reduce((sum: number, item: any) => sum + item.value, 0);
+      top5.push({
+        name: "other",
+        value: otherSum,
+        percentage: (otherSum / totalValue) * 100,
+      });
+    }
+
+    // Process for radial chart - sort by value and assign angle
+    return top5
+      .sort((a, b) => b.value - a.value)
+      .map((item, index) => {
+        const intentionConfig = getIntentionByType(item.name.toLowerCase());
+        return {
+          name: item.name,
+          displayName: item.name.charAt(0).toUpperCase() + item.name.slice(1),
+          value: item.value,
+          percentage: item.percentage,
+          fill: intentionConfig?.color || "#6b7280",
+        };
+      });
   }, [data]);
 
-  const categoryColors = useMemo(() => {
-    const colorMap: Record<string, string> = {
-      resolve: "emerald",
-      complain: "red",
-      compare: "blue",
-      cancel: "orange",
-      inquire: "purple",
-      praise: "green",
-      suggest: "cyan",
-      other: "gray",
+  const chartConfig = useMemo(() => {
+    const config: ChartConfig = {
+      value: {
+        label: "Comments",
+      },
     };
-
-    const colors = new Map();
+    
     chartData.forEach((item) => {
-      colors.set(item.name, colorMap[item.name] || "gray");
+      const intentionConfig = getIntentionByType(item.name.toLowerCase());
+      config[item.name] = {
+        label: item.displayName,
+        color: intentionConfig?.color || "#6b7280",
+      };
     });
-    return colors;
+    
+    return config;
   }, [chartData]);
 
+  const totalComments = chartData.reduce((sum, item) => sum + item.value, 0);
+
   return (
-    <div className="flex-1 flex flex-col border-l">
-      <h3 className="text-muted-foreground/60 text-sm text-center mt-4">
-        Intention type distribution
-      </h3>
-      <div className="flex-1 flex flex-col items-center justify-center">
-        <DonutChart
-          data={chartData}
-          category="name"
-          value="value"
-          variant="donut"
-          colors={[
-            "emerald",
-            "red",
-            "blue",
-            "orange",
-            "purple",
-            "green",
-            "cyan",
-            "gray",
-          ]}
-          valueFormatter={(value) => value.toLocaleString()}
-          showTooltip={true}
-          className="h-56 w-56"
-        />
+    <div className="flex-1 flex items-center justify-between gap-6 min-h-0">
+      {/* Chart Container */}
+      <div className="flex-1 flex flex-col items-center justify-center p-6">
+        <ChartContainer
+          config={chartConfig}
+          className="mx-auto aspect-square h-[400px] w-[400px]"
+        >
+          <RadialBarChart
+            data={chartData}
+            startAngle={90}
+            endAngle={450}
+            innerRadius={60}
+            outerRadius={180}
+          >
+            <ChartTooltip
+              cursor={false}
+              content={
+                <ChartTooltipContent
+                  hideLabel
+                  formatter={(value, name) => (
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-medium">{name}:</span>
+                      <span>{value.toLocaleString()} comments</span>
+                    </div>
+                  )}
+                />
+              }
+            />
+            <PolarAngleAxis
+              type="number"
+              domain={[0, totalComments]}
+              angleAxisId={0}
+              tick={false}
+            />
+            <RadialBar
+              dataKey="value"
+              cornerRadius={4}
+              fill="#8884d8"
+              className="stroke-transparent stroke-2"
+            />
+            {/* Center text */}
+            <text
+              x="50%"
+              y="50%"
+              textAnchor="middle"
+              dominantBaseline="middle"
+              className="fill-foreground text-3xl font-bold"
+            >
+              {totalComments.toLocaleString()}
+            </text>
+            <text
+              x="50%"
+              y="50%"
+              textAnchor="middle"
+              dominantBaseline="middle"
+              className="fill-muted-foreground text-sm"
+              dy={28}
+            >
+              Total
+            </text>
+          </RadialBarChart>
+        </ChartContainer>
       </div>
 
-      <div className="py-4 px-6">
-        {chartData.slice(0, 6).map((item) => {
-          const intentionConfig = getIntentionByType(item.name);
-          const color = categoryColors.get(item.name);
+      {/* Legend */}
+      <div className="px-6 pb-4 space-y-2 flex-1">
+        {chartData.map((item) => {
+          const intentionConfig = getIntentionByType(item.name.toLowerCase());
           return (
             <div
               key={item.name}
-              className="flex items-center justify-between px-3 py-1.5 rounded-md hover:bg-muted/50"
+              className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-muted/30 transition-colors"
             >
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
                 <div
-                  className={cn(
-                    "h-3 w-3 rounded-full",
-                    getColorClassName(color, "bg")
-                  )}
+                  className="h-3 w-3 rounded-full flex-shrink-0"
+                  style={{ backgroundColor: item.fill }}
                 />
-                {intentionConfig && (
-                  <intentionConfig.icon
-                    className="h-3 w-3"
-                    style={{ color: intentionConfig.color }}
-                  />
-                )}
-                <p className="text-sm capitalize">{item.name}</p>
+                <div className="flex items-center gap-2">
+                  {intentionConfig && (
+                    <intentionConfig.icon 
+                      className="h-3.5 w-3.5 opacity-70"
+                      style={{ color: intentionConfig.color }}
+                    />
+                  )}
+                  <span className="text-sm font-medium capitalize">
+                    {item.displayName}
+                  </span>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium">{item.value}</span>
-                <span className="text-xs text-muted-foreground">
+              <div className="flex items-center gap-3 text-right">
+                <span className="text-sm font-semibold">
+                  {item.value.toLocaleString()}
+                </span>
+                <span className="text-xs text-muted-foreground min-w-[45px]">
                   ({item.percentage?.toFixed(1)}%)
                 </span>
               </div>
@@ -436,15 +508,15 @@ export const IntentionDistribution: React.FC<IntentionDistributionProps> = ({
 
       {/* Main Content - Tabs */}
       <div className="flex-1 px-6 py-4">
-        <Tabs defaultValue="list">
-          <TabsList className="w-full flex">
-            <TabsTrigger value="list">Intentions</TabsTrigger>
-            <TabsTrigger value="pie">Type Chart</TabsTrigger>
+        <Tabs defaultValue="pie" className="h-full flex flex-col">
+          <TabsList className="w-full">
+            <TabsTrigger value="pie" className="flex-1">Type Chart</TabsTrigger>
+            <TabsTrigger value="list" className="flex-1">Intentions</TabsTrigger>
           </TabsList>
-          <TabsContent value="list">
+          <TabsContent value="list" className="flex-1 mt-4">
             <IntentionLevelsList className="flex-1" />
           </TabsContent>
-          <TabsContent value="pie">
+          <TabsContent value="pie" className="flex-1 mt-4">
             <IntentionTypePie data={data} />
           </TabsContent>
         </Tabs>
@@ -453,7 +525,7 @@ export const IntentionDistribution: React.FC<IntentionDistributionProps> = ({
       {/* Footer */}
       <div className="px-6 py-3 border-t">
         <p className="text-xs text-muted-foreground">
-          {GRO_METRICS.OVERVIEW.HELP_TEXT}
+          Monitor intention patterns to understand customer needs and improve service delivery.
         </p>
       </div>
     </DataCard>

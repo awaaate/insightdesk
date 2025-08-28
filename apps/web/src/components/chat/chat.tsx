@@ -1,73 +1,40 @@
 "use client";
 
+import { Loader } from "@/components/ai-elements/loader";
 import {
-  Conversation,
-  ConversationContent,
-  ConversationScrollButton,
-} from "@/components/ai-elements/conversation";
-import { Message, MessageContent } from "@/components/ai-elements/message";
-import {
-  PromptInput,
-  PromptInputButton,
-  PromptInputModelSelect,
-  PromptInputModelSelectContent,
-  PromptInputModelSelectItem,
-  PromptInputModelSelectTrigger,
-  PromptInputModelSelectValue,
-  PromptInputSubmit,
-  PromptInputTextarea,
-  PromptInputToolbar,
-  PromptInputTools,
-} from "@/components/ai-elements/prompt-input";
-import { useState, useEffect, useRef } from "react";
-import { useChat } from "@ai-sdk/react";
-import { Response } from "@/components/ai-elements/response";
-import {
-  GlobeIcon,
-  Sparkles,
-  Send,
-  Mic,
-  Paperclip,
-  Image,
-  FileText,
-  Code,
-  Hash,
-  Zap,
-  Brain,
-  AlertCircle,
-  ChevronDown,
-} from "lucide-react";
+  Reasoning,
+  ReasoningContent,
+  ReasoningTrigger,
+} from "@/components/ai-elements/reasoning";
 import {
   Source,
   Sources,
   SourcesContent,
   SourcesTrigger,
 } from "@/components/ai-elements/source";
-import {
-  Reasoning,
-  ReasoningContent,
-  ReasoningTrigger,
-} from "@/components/ai-elements/reasoning";
-import { Loader } from "@/components/ai-elements/loader";
-import { DefaultChatTransport } from "ai";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
+import { MarkdownRenderer } from "@/components/ui/markdown-renderer";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
+import { useChat } from "@ai-sdk/react";
+import { DefaultChatTransport } from "ai";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Separator } from "@/components/ui/separator";
+  AlertCircle,
+  Brain,
+  Code,
+  Hash,
+  Image,
+  Paperclip,
+  Send,
+  Zap
+} from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 
 // Suggested prompts for quick actions
 const suggestedPrompts = [
@@ -127,49 +94,50 @@ export const Chat = () => {
   const showWelcome = messages.length === 0;
 
   return (
-    <div className="flex flex-col h-full bg-gradient-to-b from-background to-muted/5">
+    <div className="flex flex-col h-screen max-h-[100vh-400px] overflow-hidden bg-gradient-to-b from-background to-muted/5">
       {/* Chat Messages Area */}
-      <ScrollArea className="flex-1 px-4">
-        <div className="py-4 space-y-4">
-          {showWelcome ? (
-            <div className="flex flex-col items-center justify-center h-full min-h-[400px] text-center">
-              <img
-                src={`${
-                  import.meta.env.VITE_SERVER_URL
-                }/assets/mascota-colgada.webp`}
-                alt="Leti mascot"
-                className="h-24 w-24 text-primary -mb-6 relative z-10"
-              />
-              <div className="flex flex-col items-center justify-center bg-card p-4 py-8 rounded-xl shadow-lg border">
-                <h3 className="text-lg font-semibold mb-2">
-                  ¡ Tus Agentes de lA listos para charlar !
-                </h3>
-                <p className="text-sm text-muted-foreground mb-6 max-w-sm">
-                  Pregunta lo que quieras. Te ayudo con los datos de
-                  InsightDESK, sacar conclusiones, análisis de insights del
-                  dashboard.
-                </p>
+      <div className="flex-1 overflow-hidden">
+        <ScrollArea className="h-full px-4">
+          <div className="py-4 space-y-4">
+            {showWelcome ? (
+              <div className="flex flex-col items-center justify-center min-h-[calc(100vh-400px)] text-center">
+                <img
+                  src={`${
+                    import.meta.env.VITE_SERVER_URL
+                  }/assets/mascota-colgada.webp`}
+                  alt="Leti mascot"
+                  className="h-24 w-24 text-primary -mb-6 relative z-10"
+                />
+                <div className="flex flex-col items-center justify-center bg-card p-4 py-8 rounded-xl shadow-lg border">
+                  <h3 className="text-lg font-semibold mb-2">
+                    ¡ Tus Agentes de lA listos para charlar !
+                  </h3>
+                  <p className="text-sm text-muted-foreground mb-6 max-w-sm">
+                    Pregunta lo que quieras. Te ayudo con los datos de
+                    InsightDESK, sacar conclusiones, análisis de insights del
+                    dashboard.
+                  </p>
 
-                {/* Suggested Prompts */}
-                <div className="grid grid-cols-2 gap-2 w-full max-w-md">
-                  {suggestedPrompts.map((prompt, i) => (
-                    <Button
-                      key={i}
-                      variant="outline"
-                      size="sm"
-                      className="justify-start gap-2 text-xs h-auto py-2 px-3 hover:bg-primary/10 transition-colors"
-                      onClick={() => handleSuggestedPrompt(prompt.text)}
-                    >
-                      {prompt.icon}
-                      <span className="text-left">{prompt.text}</span>
-                    </Button>
-                  ))}
+                  {/* Suggested Prompts */}
+                  <div className="grid grid-cols-2 gap-2 w-full max-w-md">
+                    {suggestedPrompts.map((prompt, i) => (
+                      <Button
+                        key={i}
+                        variant="outline"
+                        size="sm"
+                        className="justify-start gap-2 text-xs h-auto py-2 px-3 hover:bg-primary/10 transition-colors"
+                        onClick={() => handleSuggestedPrompt(prompt.text)}
+                      >
+                        {prompt.icon}
+                        <span className="text-left">{prompt.text}</span>
+                      </Button>
+                    ))}
+                  </div>
                 </div>
               </div>
-            </div>
-          ) : (
-            <>
-              {messages.map((message) => (
+            ) : (
+              <>
+                {messages.map((message) => (
                 <div
                   key={message.id}
                   className={cn(
@@ -231,17 +199,17 @@ export const Chat = () => {
                         switch (part.type) {
                           case "text":
                             return (
-                              <div
+                              <MarkdownRenderer
                                 key={`${message.id}-${i}`}
                                 className={cn(
-                                  "text-sm",
+                                  "text-sm prose prose-sm",
                                   message.role === "user"
                                     ? "text-primary-foreground"
                                     : ""
                                 )}
                               >
                                 {part.text}
-                              </div>
+                              </MarkdownRenderer>
                             );
                           case "reasoning":
                             return (
@@ -298,9 +266,10 @@ export const Chat = () => {
           <div ref={scrollRef} />
         </div>
       </ScrollArea>
+    </div>
 
       {/* Input Area */}
-      <div className="border-t bg-card/50 backdrop-blur-sm p-4">
+      <div className="flex-shrink-0 border-t bg-card/50 backdrop-blur-sm p-4">
         <form onSubmit={handleSubmit} className="space-y-3">
           {/* Quick Actions Bar */}
           <div className="flex items-center gap-2">
