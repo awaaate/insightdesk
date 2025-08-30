@@ -32,6 +32,7 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
+import { useAnalyticsFilters } from "@/hooks/use-analytics-filters";
 
 interface IntentionDistributionProps {
   className?: string;
@@ -41,25 +42,33 @@ interface IntentionDistributionProps {
 export const IntentionLevelsList: React.FC<{
   className?: string;
 }> = ({ className }) => {
+  const filters = useAnalyticsFilters();
+  
   const {
     data: dataGro,
     isLoading,
     error,
-  } = useQuery(trpc.analytics.gro.overview.queryOptions());
+  } = useQuery(trpc.analytics.intentDistribution.queryOptions({
+    timeRange: filters.timeRange,
+    business_unit: filters.businessUnit,
+    operational_area: filters.operationalArea,
+    source: filters.source,
+    limit: filters.limit,
+    minComments: filters.minComments,
+  }));
 
   const analysis = useMemo(() => {
-    if (!dataGro) return null;
+    if (!dataGro || dataGro.length === 0) return null;
 
-    const { raw, statistics } = dataGro;
-    const maxCount = Math.max(...raw.intentionDistribution.map((i) => i.count));
-    const totalComments = statistics.totalAnalyzed;
+    const maxCount = Math.max(...dataGro.map((i) => i.count));
+    const totalComments = dataGro.reduce((sum, i) => sum + i.count, 0);
 
     // Calculate high-risk intentions (cancel, complain)
-    const highRiskCount = raw.intentionDistribution
+    const highRiskCount = dataGro
       .filter((i) => ["cancel", "complain"].includes(i.type))
       .reduce((sum, i) => sum + i.count, 0);
 
-    const highRiskPercentage = (highRiskCount / totalComments) * 100;
+    const highRiskPercentage = totalComments > 0 ? (highRiskCount / totalComments) * 100 : 0;
 
     return {
       maxCount,
@@ -67,7 +76,7 @@ export const IntentionLevelsList: React.FC<{
       highRiskPercentage,
       hasHighRisk: highRiskPercentage > 20,
       hasCancellations:
-        raw.intentionDistribution.find((i) => i.type === "cancel")?.count > 0,
+        dataGro.find((i) => i.type === "cancel")?.count > 0,
     };
   }, [dataGro]);
 
@@ -102,7 +111,7 @@ export const IntentionLevelsList: React.FC<{
   }
 
   const maxCount = analysis?.maxCount || 0;
-  const data = dataGro.raw.intentionDistribution;
+  const data = dataGro || [];
 
   // Sort by priority for display
   const sortedData = [...data].sort((a, b) => {
@@ -114,13 +123,13 @@ export const IntentionLevelsList: React.FC<{
       <div className="flex-1 overflow-y-auto px-6 py-4">
         <div className="space-y-2">
           {sortedData.slice(0, 10).map((item, index) => {
-            const intentionConfig = getIntentionByType(item.type);
+            const intentionConfig = getIntentionByType(item.type || "");
             const percentage = (item.count / maxCount) * 100;
-            const isHighRisk = ["cancel", "complain"].includes(item.type);
+            const isHighRisk = ["cancel", "complain"].includes(item.type || "");
 
             return (
               <div
-                key={item.intentionId}
+                key={item.id}
                 className={cn(
                   "group relative flex items-center justify-between p-3 transition-all",
                   "hover:bg-background rounded-lg"
@@ -209,30 +218,37 @@ export const IntentionLevelsList: React.FC<{
 
 // Component for the type distribution radial chart
 const IntentionTypePie: React.FC<{
-  data: any;
+  data: Array<{
+    id: number;
+    type: string | null;
+    name: string;
+    description: string;
+    count: number;
+  }>;
 }> = ({ data }) => {
   const chartData = useMemo(() => {
-    if (!data?.pieChart) return [];
+    if (!data || data.length === 0) return [];
 
+    const totalValue = data.reduce((sum, item) => sum + item.count, 0);
+    
     // Get top 5 intentions by count and aggregate the rest as "Other"
-    const sortedData = data.pieChart.labels
-      .map((label: string, index: number) => ({
-        name: label,
-        value: data.pieChart.datasets[0].data[index],
-        percentage: data.pieChart.datasets[0].percentages[index],
-      }))
-      .sort((a: any, b: any) => b.value - a.value);
+    const sortedData = [...data]
+      .sort((a, b) => b.count - a.count)
+      .map((item) => ({
+        name: item.type || item.name,
+        value: item.count,
+        percentage: totalValue > 0 ? (item.count / totalValue) * 100 : 0,
+      }));
 
     // Take top 5 and add others if needed
     const top5 = sortedData.slice(0, 5);
-    const otherSum = sortedData.slice(5).reduce((sum: number, item: any) => sum + item.value, 0);
+    const otherSum = sortedData.slice(5).reduce((sum, item) => sum + item.value, 0);
     
     if (otherSum > 0) {
-      const totalValue = sortedData.reduce((sum: number, item: any) => sum + item.value, 0);
       top5.push({
         name: "other",
         value: otherSum,
-        percentage: (otherSum / totalValue) * 100,
+        percentage: totalValue > 0 ? (otherSum / totalValue) * 100 : 0,
       });
     }
 
@@ -381,23 +397,31 @@ const IntentionTypePie: React.FC<{
 export const IntentionDistribution: React.FC<IntentionDistributionProps> = ({
   className,
 }) => {
+  const filters = useAnalyticsFilters();
+  
   const { data, isLoading, error } = useQuery(
-    trpc.analytics.gro.overview.queryOptions()
+    trpc.analytics.intentDistribution.queryOptions({
+      timeRange: filters.timeRange,
+      business_unit: filters.businessUnit,
+      operational_area: filters.operationalArea,
+      source: filters.source,
+      limit: filters.limit,
+      minComments: filters.minComments,
+    })
   );
 
   const analysis = useMemo(() => {
-    if (!data) return null;
+    if (!data || data.length === 0) return null;
 
-    const { raw, statistics } = data;
-    const maxCount = Math.max(...raw.intentionDistribution.map((i) => i.count));
-    const totalComments = statistics.totalAnalyzed;
+    const maxCount = Math.max(...data.map((i) => i.count));
+    const totalComments = data.reduce((sum, i) => sum + i.count, 0);
 
     // Calculate high-risk intentions
-    const highRiskCount = raw.intentionDistribution
-      .filter((i) => ["cancel", "complain"].includes(i.type))
+    const highRiskCount = data
+      .filter((i) => ["cancel", "complain"].includes(i.type || ""))
       .reduce((sum, i) => sum + i.count, 0);
 
-    const highRiskPercentage = (highRiskCount / totalComments) * 100;
+    const highRiskPercentage = totalComments > 0 ? (highRiskCount / totalComments) * 100 : 0;
 
     return {
       maxCount,
@@ -405,8 +429,8 @@ export const IntentionDistribution: React.FC<IntentionDistributionProps> = ({
       highRiskPercentage,
       hasHighRisk: highRiskPercentage > 20,
       hasCancellations:
-        raw.intentionDistribution.find((i) => i.type === "cancel")?.count > 0,
-      multipleIntentions: statistics.multipleIntentionsCount,
+        data.find((i) => i.type === "cancel")?.count > 0,
+      multipleIntentions: 0, // This would need to be calculated separately if needed
     };
   }, [data]);
 

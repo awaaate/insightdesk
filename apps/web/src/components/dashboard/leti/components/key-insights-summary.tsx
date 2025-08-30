@@ -21,6 +21,7 @@ import { IconTooltip } from "@/components/common/icon-tooltip";
 import { LETI_METRICS } from "../helpers/leti-constants";
 import { divide } from "remeda";
 import { AverageIntensityCard } from "../../pix/components/sentiment-summary";
+import { useAnalyticsFilters } from "@/hooks/use-analytics-filters";
 
 interface KeyInsightsSummaryProps {
   className?: string;
@@ -29,12 +30,18 @@ interface KeyInsightsSummaryProps {
 export const KeyInsightsSummary: React.FC<KeyInsightsSummaryProps> = ({
   className,
 }) => {
+  const filters = useAnalyticsFilters();
+  
   const {
     data: insights,
     isLoading,
     error,
   } = useQuery(
-    trpc.analytics.leti.topInsights.queryOptions({
+    trpc.analytics.topInsights.queryOptions({
+      timeRange: filters.timeRange,
+      business_unit: filters.businessUnit,
+      operational_area: filters.operationalArea,
+      source: filters.source,
       minComments: 1,
       limit: 50,
     })
@@ -44,12 +51,12 @@ export const KeyInsightsSummary: React.FC<KeyInsightsSummaryProps> = ({
     if (!insights || insights.length === 0) return null;
 
     const totalComments = insights.reduce((sum, i) => sum + i.totalComments, 0);
-    const aiGenerated = insights.filter((i) => i.aiGenerated);
+    const aiGenerated = insights.filter((i) => i.emergent);
     const topInsight = insights[0];
 
     // Find most recent emergent insight
     const recentEmergent = [...insights]
-      .filter((i) => i.aiGenerated)
+      .filter((i) => i.emergent)
       .sort(
         (a, b) =>
           new Date(b.emergenceDate).getTime() -
@@ -191,7 +198,7 @@ export const KeyInsightsSummary: React.FC<KeyInsightsSummaryProps> = ({
             <div className="flex items-center gap-2">
               <LETI_METRICS.KEY_METRICS.LATEST_DISCOVERY.icon className="h-4 w-4" />
               <span>{LETI_METRICS.KEY_METRICS.LATEST_DISCOVERY.label}</span>
-              {keyMetrics.recentEmergent?.aiGenerated && (
+              {keyMetrics.recentEmergent?.emergent && (
                 <Badge
                   variant="secondary"
                   className="text-xs text-brand rounded-full border-brand/30 bg-brand/10"

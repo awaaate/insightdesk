@@ -10,6 +10,7 @@ import { CommentsTable } from "@/components/comments/comments-table";
 import { DataCard } from "@/components/data/card";
 import { CommentsTableEnhanced } from "@/components/comments/comments-table-enhanced";
 import { AIAgentsBrainBar } from "./components/ai-agents-brainbar";
+import { AnalyticsFilterBar } from "@/components/dashboard/shared/analytics-filter-bar";
 
 interface LetiDashboardProps {
   className?: string;
@@ -18,6 +19,9 @@ interface LetiDashboardProps {
 export const LetiDashboard: React.FC<LetiDashboardProps> = ({ className }) => {
   return (
     <div className={cn("space-y-6", className)}>
+      {/* Global Analytics Filters - Applied to all components */}
+      <AnalyticsFilterBar className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60" />
+      
       {/* AI Agent Key Insights - Top Section */}
 
       {/* Key Insights Summary - Second Row */}

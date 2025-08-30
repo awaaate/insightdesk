@@ -32,6 +32,7 @@ import {
   getColorClassName,
 } from "@/lib/chartUtils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useAnalyticsFilters } from "@/hooks/use-analytics-filters";
 interface TopInsightsSectionProps {
   className?: string;
 }
@@ -39,9 +40,11 @@ interface TopInsightsSectionProps {
 interface InsightData {
   id: number;
   name: string;
-  description: string;
+  description: string | null;
   totalComments: number;
-  aiGenerated: boolean;
+  emergent: boolean;
+  operational_area: string | null;
+  business_unit: string | null;
 }
 
 // Component for the insights list on the left side
@@ -85,10 +88,12 @@ const InsightsList: React.FC<{
                         </TooltipTrigger>
                         <TooltipContent className="max-w-md">
                           <p className="font-medium mb-1">{insight.name}</p>
-                          <p className="text-xs">{insight.description}</p>
+                          <p className="text-xs">
+                            {insight.description || "No description available"}
+                          </p>
                         </TooltipContent>
                       </Tooltip>
-                      {insight.aiGenerated && (
+                      {insight.emergent && (
                         <Bot className="h-3 w-3 text-purple-500 flex-shrink-0" />
                       )}
                     </div>
@@ -151,7 +156,7 @@ const InsightsChart: React.FC<{
           : insight.name,
       value: insight.totalComments,
       percentage: ((insight.totalComments / totalComments) * 100).toFixed(1),
-      aiGenerated: insight.aiGenerated,
+      emergent: insight.emergent,
     }));
   }, [insights]);
 
@@ -179,13 +184,13 @@ const InsightsChart: React.FC<{
 
       <div className="py-4 px-6 flex-1">
         {chartData.slice(0, 6).map((item, index) => {
-          const aiGenerated = item.aiGenerated;
+          const emergent = item.emergent;
           return (
             <div
               key={item.name}
               className={cn(
                 "flex items-center gap-2 px-3 py-1.5 rounded-md transition-colors  justify-between  ",
-                aiGenerated
+                item.emergent
                   ? "bg-primary/10 border border-primary/20"
                   : "hover:bg-muted/50"
               )}
@@ -201,7 +206,7 @@ const InsightsChart: React.FC<{
                   )}
                 />
                 <div>
-                  <p className={cn("text-sm", aiGenerated && "font-semibold")}>
+                  <p className={cn("text-sm", emergent && "font-semibold")}>
                     {item.name}
                   </p>
                   <p className="text-xs flex items-center gap-1">
@@ -215,7 +220,7 @@ const InsightsChart: React.FC<{
                 </div>
               </div>
 
-              {aiGenerated && (
+              {emergent && (
                 <Badge variant="outline" className="text-xs px-1 py-0">
                   Emergent
                 </Badge>
@@ -231,12 +236,18 @@ const InsightsChart: React.FC<{
 export const TopInsightsSection: React.FC<TopInsightsSectionProps> = ({
   className,
 }) => {
+  const filters = useAnalyticsFilters();
+
   const {
     data: insights,
     isLoading,
     error,
   } = useQuery(
-    trpc.analytics.leti.topInsights.queryOptions({
+    trpc.analytics.topInsights.queryOptions({
+      timeRange: filters.timeRange,
+      business_unit: filters.businessUnit,
+      operational_area: filters.operationalArea,
+      source: filters.source,
       minComments: 1,
       limit: 20,
     })

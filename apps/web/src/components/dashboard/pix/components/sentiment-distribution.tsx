@@ -29,6 +29,7 @@ import {
   getColorClassName,
 } from "@/lib/chartUtils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useAnalyticsFilters } from "@/hooks/use-analytics-filters";
 
 interface SentimentDistributionProps {
   className?: string;
@@ -38,36 +39,46 @@ interface SentimentDistributionProps {
 export const SentimentLevelsList: React.FC<{
   className?: string;
 }> = ({ className }) => {
+  const filters = useAnalyticsFilters();
+
   const {
     data: dataPixe,
     isLoading,
     error,
-  } = useQuery(trpc.analytics.pixe.overview.queryOptions());
+  } = useQuery(
+    trpc.analytics.sentimentDistribution.queryOptions({
+      timeRange: filters.timeRange,
+      business_unit: filters.businessUnit,
+      operational_area: filters.operationalArea,
+      source: filters.source,
+      limit: filters.limit,
+      minComments: filters.minComments,
+    })
+  );
 
   const analysis = useMemo(() => {
-    if (!dataPixe) return null;
-    console.log(dataPixe);
-    const { raw, statistics } = dataPixe;
-    const maxCount = Math.max(...raw.sentimentDistribution.map((s) => s.count));
-    const totalComments = statistics.totalAnalyzed;
+    if (!dataPixe || dataPixe.length === 0) return null;
+
+    const maxCount = Math.max(...dataPixe.map((s) => s.count));
+    const totalComments = dataPixe.reduce((sum, s) => sum + s.count, 0);
 
     // Calculate sentiment balance
-    const negativeCount = raw.sentimentDistribution
+    const negativeCount = dataPixe
       .filter((s) => s.intensityValue < 0)
       .reduce((sum, s) => sum + s.count, 0);
-    const positiveCount = raw.sentimentDistribution
+    const positiveCount = dataPixe
       .filter((s) => s.intensityValue > 0)
       .reduce((sum, s) => sum + s.count, 0);
 
-    const negativePercentage = (negativeCount / totalComments) * 100;
+    const negativePercentage =
+      totalComments > 0 ? (negativeCount / totalComments) * 100 : 0;
 
     return {
       maxCount,
       totalComments,
       negativePercentage,
       hasHighNegative: negativePercentage > 70,
-      hasCritical:
-        raw.severitySummary.find((s) => s.severity === "critical")?.count > 0,
+      hasCritical: dataPixe.some((s) => s.severity === "critical"),
     };
   }, [dataPixe]);
 
@@ -109,8 +120,8 @@ export const SentimentLevelsList: React.FC<{
     );
   }
   const maxCount = analysis?.maxCount || 0;
-  const data = dataPixe.raw.sentimentDistribution;
-  const mostCommon = data.sort((a, b) => b.count - a.count).slice(0, 10);
+  const data = dataPixe || [];
+  const mostCommon = [...data].sort((a, b) => b.count - a.count).slice(0, 10);
   return (
     <div className="flex-1 flex flex-col min-h-0">
       <div className="flex-1 overflow-y-auto px-6 py-4">
@@ -125,7 +136,7 @@ export const SentimentLevelsList: React.FC<{
 
             return (
               <div
-                key={item.sentimentId}
+                key={item.id}
                 className={cn(
                   "group relative flex items-center justify-between p-3 transition-all",
                   "hover:bg-background rounded-lg"
@@ -215,7 +226,7 @@ const SentimentDistributionPie: React.FC<{
     count: number;
     intensityValue: number;
     level: string;
-    sentimentId: string;
+    id: number;
   }[];
 }> = ({ data }) => {
   const chartData = useMemo(() => {
@@ -296,39 +307,47 @@ const SentimentDistributionPie: React.FC<{
 export const SentimentDistribution: React.FC<SentimentDistributionProps> = ({
   className,
 }) => {
+  const filters = useAnalyticsFilters();
+
   const { data, isLoading, error } = useQuery(
-    trpc.analytics.pixe.overview.queryOptions()
+    trpc.analytics.sentimentDistribution.queryOptions({
+      timeRange: filters.timeRange,
+      business_unit: filters.businessUnit,
+      operational_area: filters.operationalArea,
+      source: filters.source,
+      limit: filters.limit,
+      minComments: filters.minComments,
+    })
   );
 
   const analysis = useMemo(() => {
-    if (!data) return null;
+    if (!data || data.length === 0) return null;
 
-    const { raw, statistics } = data;
-    const maxCount = Math.max(...raw.sentimentDistribution.map((s) => s.count));
-    const totalComments = statistics.totalAnalyzed;
+    const maxCount = Math.max(...data.map((s) => s.count));
+    const totalComments = data.reduce((sum, s) => sum + s.count, 0);
 
     // Calculate sentiment balance
-    const negativeCount = raw.sentimentDistribution
+    const negativeCount = data
       .filter((s) => s.intensityValue < 0)
       .reduce((sum, s) => sum + s.count, 0);
-    const positiveCount = raw.sentimentDistribution
+    const positiveCount = data
       .filter((s) => s.intensityValue > 0)
       .reduce((sum, s) => sum + s.count, 0);
 
-    const negativePercentage = (negativeCount / totalComments) * 100;
+    const negativePercentage =
+      totalComments > 0 ? (negativeCount / totalComments) * 100 : 0;
 
     return {
       maxCount,
       totalComments,
       negativePercentage,
       hasHighNegative: negativePercentage > 70,
-      hasCritical:
-        raw.severitySummary.find((s) => s.severity === "critical")?.count > 0,
+      hasCritical: data.some((s) => s.severity === "critical"),
     };
   }, [data]);
 
   const colors = constructCategoryColors(
-    data?.raw.sentimentDistribution.map((s) => s.name) || [],
+    data?.map((s) => s.name) || [],
     AvailableChartColors
   );
 
@@ -426,19 +445,18 @@ export const SentimentDistribution: React.FC<SentimentDistributionProps> = ({
       {/* Main Content - Split Layout */}
 
       <div className="px-6 py-4">
-
-      <Tabs defaultValue="list">
-        <TabsList className="w-full flex">
-          <TabsTrigger value="list">List</TabsTrigger>
-          <TabsTrigger value="pie">Pie</TabsTrigger>
-        </TabsList>
-        <TabsContent value="list">
-          <SentimentLevelsList className="flex-1" />
-        </TabsContent>
-        <TabsContent value="pie">
-          <SentimentDistributionPie data={data.raw.sentimentDistribution} />
-        </TabsContent>
-      </Tabs>
+        <Tabs defaultValue="list">
+          <TabsList className="w-full flex">
+            <TabsTrigger value="list">List</TabsTrigger>
+            <TabsTrigger value="pie">Pie</TabsTrigger>
+          </TabsList>
+          <TabsContent value="list">
+            <SentimentLevelsList className="flex-1" />
+          </TabsContent>
+          <TabsContent value="pie">
+            <SentimentDistributionPie data={data} />
+          </TabsContent>
+        </Tabs>
       </div>
 
       {/* Footer */}

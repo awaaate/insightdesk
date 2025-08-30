@@ -10,6 +10,7 @@ import { useMemo } from "react";
 import { IconTooltip } from "@/components/common/icon-tooltip";
 import { PIX_METRICS, getSeverityByName } from "../helpers/pix-constants";
 import { CategoryBar } from "@/components/data/category-bar";
+import { useAnalyticsFilters } from "@/hooks/use-analytics-filters";
 
 interface AverageIntensityCardProps {
   className?: string;
@@ -18,45 +19,55 @@ interface AverageIntensityCardProps {
 export const AverageIntensityCard: React.FC<AverageIntensityCardProps> = ({
   className,
 }) => {
+  const filters = useAnalyticsFilters();
+
   const { data, isLoading, error } = useQuery(
-    trpc.analytics.pixe.overview.queryOptions()
+    trpc.analytics.sentimentDistribution.queryOptions({
+      timeRange: filters.timeRange,
+      business_unit: filters.businessUnit,
+      operational_area: filters.operationalArea,
+      source: filters.source,
+      limit: filters.limit,
+      minComments: filters.minComments,
+    })
   );
 
   const keyMetrics = useMemo(() => {
     if (!data) return null;
 
-    const { statistics, raw } = data;
-    const dominantSeverity = getSeverityByName(statistics.dominantSeverity);
+    const dominantSeverity = getSeverityByName(data[0].severity);
 
     // Calculate sentiment balance
     const positiveCount =
-      raw.severitySummary.find((s) => s.severity === "positive")?.count || 0;
-    const negativeCount = raw.severitySummary
+      data.find((s) => s.severity === "positive")?.count || 0;
+    const negativeCount = data
       .filter((s) => ["low", "medium", "high", "critical"].includes(s.severity))
       .reduce((sum, s) => sum + s.count, 0);
-    const neutralCount =
-      raw.severitySummary.find((s) => s.severity === "none")?.count || 0;
+    const neutralCount = data.find((s) => s.severity === "none")?.count || 0;
 
     // Find most intense sentiment
-    const mostIntense = raw.sentimentDistribution.reduce((prev, current) => {
+    const mostIntense = data.reduce((prev, current) => {
       return Math.abs(current.intensityValue) > Math.abs(prev.intensityValue)
         ? current
         : prev;
     });
 
+    const totalAnalyzed = data.reduce((sum, s) => sum + s.count, 0);
+    const averageIntensity =
+      data.reduce((sum, s) => sum + s.intensityValue, 0) / data.length;
     return {
-      totalAnalyzed: statistics.totalAnalyzed,
-      averageIntensity: statistics.averageIntensity,
+      totalAnalyzed: totalAnalyzed,
+      averageIntensity: averageIntensity,
       dominantSeverity,
-      sentimentLevelsCount: statistics.sentimentLevelsCount,
+      sentimentLevelsCount: data.length,
       positiveCount,
       negativeCount,
       neutralCount,
       mostIntense,
       balance: {
-        positive: (positiveCount / statistics.totalAnalyzed) * 100,
-        negative: (negativeCount / statistics.totalAnalyzed) * 100,
-        neutral: (neutralCount / statistics.totalAnalyzed) * 100,
+        positive: (positiveCount / totalAnalyzed) * 100,
+        negative: (negativeCount / totalAnalyzed) * 100,
+        neutral: (neutralCount / totalAnalyzed) * 100,
       },
     };
   }, [data]);
