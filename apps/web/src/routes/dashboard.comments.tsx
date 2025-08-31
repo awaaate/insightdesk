@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/dialog"
 import { format } from "date-fns"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { AnalyticsFilterBar } from "@/components/dashboard/shared/analytics-filter-bar"
 
 export const Route = createFileRoute('/dashboard/comments')({
   component: CommentsPage,
@@ -70,6 +71,9 @@ function CommentsPage() {
           Explore and analyze customer comments with AI-powered insights, sentiment analysis, and intention detection.
         </p>
       </div>
+
+      {/* Global Filters */}
+      <AnalyticsFilterBar />
 
       {/* Stats Cards */}
       <div className="grid gap-4 md:grid-cols-4">

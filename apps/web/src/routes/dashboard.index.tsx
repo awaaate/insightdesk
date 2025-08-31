@@ -66,7 +66,7 @@ function RouteComponent() {
   };
 
   return (
-    <div className="h-full w-full bg-gradient-to-br from-background via-background to-muted/20">
+    <div className="h-full w-max bg-gradient-to-br from-background via-background to-muted/20">
       {isChatOpen ? (
         <ResizablePanelGroup
           direction="horizontal"
@@ -106,7 +106,8 @@ function RouteComponent() {
                   <div className="flex items-center gap-2">
                     <Badge variant="secondary" className="gap-1 text-xs">
                       <Sparkles className="h-3 w-3" />
-                      Generado mediante sistemas de IA Multi-Agente y tecnología NLP
+                      Generado mediante sistemas de IA Multi-Agente y tecnología
+                      NLP
                     </Badge>
 
                     <Tooltip>
@@ -241,7 +242,10 @@ function RouteComponent() {
               </div>
 
               <div className="flex items-center gap-2">
-                <Badge variant="secondary" className="gap-1 text-xs text-brand/70  bg-background border-brand/20">
+                <Badge
+                  variant="secondary"
+                  className="gap-1 text-xs text-brand/70  bg-background border-brand/20"
+                >
                   <Sparkles className="h-3 w-3" />
                   Generado mediante sistemas de IA Multi-Agente y tecnología NLP
                 </Badge>

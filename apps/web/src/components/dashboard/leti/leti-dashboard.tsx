@@ -21,7 +21,7 @@ export const LetiDashboard: React.FC<LetiDashboardProps> = ({ className }) => {
     <div className={cn("space-y-6", className)}>
       {/* Global Analytics Filters - Applied to all components */}
       <AnalyticsFilterBar className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60" />
-      
+
       {/* AI Agent Key Insights - Top Section */}
 
       {/* Key Insights Summary - Second Row */}
@@ -31,22 +31,22 @@ export const LetiDashboard: React.FC<LetiDashboardProps> = ({ className }) => {
         <SentimentDistribution />
       </div>
       <IntentionDistribution />
-      
+
       {/* AI Agents Brain-bar - Analysis insights from specialized agents */}
       <AIAgentsBrainBar />
-      
+
       {/* Main Content Grid */}
 
       {/*       <InsightCorrelations />
       <div id="leti-key-insight">
         <LetiKeyInsights />
       </div> */}
-      <DataCard>
+      <DataCard className="w-full">
         <DataCard.Header
           title="Comments"
           description="Comments from the AI Agent"
         />
-        <div className="h-[500px] p-4">
+        <div className="h-[500px] p-4 max-w-full overflow-auto">
           <CommentsTableEnhanced />
         </div>
       </DataCard>

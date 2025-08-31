@@ -111,6 +111,7 @@ export namespace SharedTypes {
 
       // Extended comment with full relations
       export const WithFullRelationsSchema = Schema.extend({
+        source: z.string().nullable(),
         insights: z
           .array(
             z.object({
@@ -119,6 +120,8 @@ export namespace SharedTypes {
               content: z.string(),
               description: z.string(),
               ai_generated: z.boolean(),
+              business_unit: z.string().nullable(),
+              operational_area: z.string().nullable(),
               confidence: z.number().nullable(),
               reasoning: z.string().nullable(),
               sentiment_level_id: z.number().nullable(),

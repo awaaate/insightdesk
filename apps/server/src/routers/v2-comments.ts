@@ -26,7 +26,18 @@ export const ExtendedFilterSchema = z.object({
   hasInsights: z.boolean().optional(),
   // Intention filters
   intentionId: z.number().optional(),
-  intentionType: z.string().optional(),
+  intentionType: z
+    .enum([
+      "resolve",
+      "complain",
+      "compare",
+      "cancel",
+      "inquire",
+      "praise",
+      "suggest",
+      "other",
+    ])
+    .optional(),
   hasIntention: z.boolean().optional(),
   // Sentiment filters
   sentimentLevelId: z.number().optional(),
@@ -42,7 +53,7 @@ export const ExtendedFilterSchema = z.object({
 const ExtendedListInputSchema = z.object({
   limit: z.number().min(1).max(100).default(20),
   offset: z.number().min(0).default(0),
-  filter: SharedTypes.Domain.Comment.ExtendedFilterSchema.optional(),
+  filter: ExtendedFilterSchema.optional(),
   includeRelations: z.boolean().default(false),
   sortBy: z
     .enum(["created_at", "updated_at", "sentiment_intensity", "confidence"])
@@ -50,7 +61,174 @@ const ExtendedListInputSchema = z.object({
   sortOrder: z.enum(["asc", "desc"]).default("desc"),
 });
 
+// Helper function to build dynamic filters
+function buildFilters(filter: any) {
+  const conditions = [];
+
+  // Text search filter
+  if (filter.searchText && filter.searchText.trim() !== "") {
+    conditions.push(
+      ilike(DB.schema.comments.content, `%${filter.searchText.trim()}%`)
+    );
+  }
+
+  // Date filters
+  if (filter.startDate) {
+    conditions.push(
+      gte(DB.schema.comments.created_at, new Date(filter.startDate))
+    );
+  }
+  if (filter.endDate) {
+    conditions.push(
+      lte(DB.schema.comments.created_at, new Date(filter.endDate))
+    );
+  }
+
+  // Business unit filter - only if provided and not empty
+  if (filter.business_unit && filter.business_unit.length > 0) {
+    conditions.push(
+      inArray(DB.schema.insights.business_unit, filter.business_unit)
+    );
+  }
+
+  // Operational area filter - only if provided and not empty
+  if (filter.operational_area && filter.operational_area.length > 0) {
+    conditions.push(
+      inArray(DB.schema.insights.operational_area, filter.operational_area)
+    );
+  }
+
+  // Source filter - only if provided and not empty
+  if (filter.source && filter.source.length > 0) {
+    conditions.push(inArray(DB.schema.comments.source, filter.source));
+  }
+
+  // Insight filter
+  if (filter.insightId) {
+    conditions.push(eq(DB.schema.insights.id, filter.insightId));
+  }
+
+  // Insight IDs filter
+  if (filter.insightIds && filter.insightIds.length > 0) {
+    conditions.push(inArray(DB.schema.insights.id, filter.insightIds));
+  }
+
+  // Intention type filter
+  if (filter.intentionType) {
+    conditions.push(eq(DB.schema.intentions.type, filter.intentionType));
+  }
+
+  // Intention ID filter
+  if (filter.intentionId) {
+    conditions.push(eq(DB.schema.intentions.id, filter.intentionId));
+  }
+
+  // Sentiment level filter
+  if (filter.sentimentLevels && filter.sentimentLevels.length > 0) {
+    conditions.push(
+      inArray(DB.schema.sentiment_levels.level, filter.sentimentLevels as any)
+    );
+  }
+
+  // Sentiment level ID filter
+  if (filter.sentimentLevelId) {
+    conditions.push(eq(DB.schema.sentiment_levels.id, filter.sentimentLevelId));
+  }
+
+  // Sentiment severity filter
+  if (filter.sentimentSeverity) {
+    conditions.push(
+      eq(DB.schema.sentiment_levels.severity, filter.sentimentSeverity)
+    );
+  }
+
+  // Confidence filter
+  if (filter.minConfidence) {
+    conditions.push(
+      gte(DB.schema.comment_insights.confidence, filter.minConfidence / 10)
+    );
+  }
+
+  return conditions.length > 0 ? and(...conditions) : undefined;
+}
+
 export const v2CommentsRouter = router({
+  // Get unique filter values from database
+  getFilterOptions: publicProcedure.query(async ({ ctx }) => {
+    const { db } = ctx;
+
+    // Get unique business units
+    const businessUnitsResult = await db
+      .selectDistinct({
+        value: DB.schema.insights.business_unit,
+      })
+      .from(DB.schema.insights)
+      .where(isNotNull(DB.schema.insights.business_unit));
+
+    // Get unique operational areas
+    const operationalAreasResult = await db
+      .selectDistinct({
+        value: DB.schema.insights.operational_area,
+      })
+      .from(DB.schema.insights)
+      .where(isNotNull(DB.schema.insights.operational_area));
+
+    // Get unique sources
+    const sourcesResult = await db
+      .selectDistinct({
+        value: DB.schema.comments.source,
+      })
+      .from(DB.schema.comments)
+      .where(isNotNull(DB.schema.comments.source));
+
+    // Get unique insight IDs and names
+    const insightsResult = await db
+      .selectDistinct({
+        id: DB.schema.insights.id,
+        name: DB.schema.insights.name,
+      })
+      .from(DB.schema.insights);
+
+    // Get unique intention types
+    const intentionTypesResult = await db
+      .selectDistinct({
+        type: DB.schema.intentions.type,
+      })
+      .from(DB.schema.intentions);
+
+    // Get unique sentiment levels
+    const sentimentLevelsResult = await db
+      .selectDistinct({
+        level: DB.schema.sentiment_levels.level,
+        severity: DB.schema.sentiment_levels.severity,
+      })
+      .from(DB.schema.sentiment_levels);
+
+    return {
+      businessUnits: businessUnitsResult
+        .map((r) => r.value)
+        .filter((v): v is string => v !== null)
+        .sort(),
+      operationalAreas: operationalAreasResult
+        .map((r) => r.value)
+        .filter((v): v is string => v !== null)
+        .sort(),
+      sources: sourcesResult
+        .map((r) => r.value)
+        .filter((v): v is string => v !== null)
+        .sort(),
+      insights: insightsResult.map((r) => ({
+        id: r.id,
+        name: r.name,
+      })),
+      intentionTypes: intentionTypesResult.map((r) => r.type).sort(),
+      sentimentLevels: sentimentLevelsResult.map((r) => ({
+        level: r.level,
+        severity: r.severity,
+      })),
+    };
+  }),
+
   listWithRelations: publicProcedure
     .input(ExtendedListInputSchema)
     .query(async ({ ctx, input }) => {
@@ -61,6 +239,9 @@ export const v2CommentsRouter = router({
       const sortOrder = input?.sortOrder ?? "desc";
 
       try {
+        // Build dynamic filters
+        const whereConditions = filter ? buildFilters(filter) : undefined;
+
         // Build main query with INNER JOINs to force all relationships
         const baseQuery = ctx.db
           .select({
@@ -75,6 +256,7 @@ export const v2CommentsRouter = router({
             insight_name: DB.schema.insights.name,
             insight_description: DB.schema.insights.description,
             insight_business_unit: DB.schema.insights.business_unit,
+            insight_operational_area: DB.schema.insights.operational_area,
             insight_ai_generated: DB.schema.insights.ai_generated,
             // Comment-Insight relation fields
             ci_confidence: DB.schema.comment_insights.confidence,
@@ -136,77 +318,9 @@ export const v2CommentsRouter = router({
             )
           );
 
-        // Apply filters
-        const conditions = [];
-
-        if (filter) {
-          // Text search filter
-          if (filter.searchText && filter.searchText.trim() !== "") {
-            conditions.push(
-              ilike(DB.schema.comments.content, `%${filter.searchText.trim()}%`)
-            );
-          }
-
-          // Date filters
-          if (filter.startDate) {
-            conditions.push(
-              gte(DB.schema.comments.created_at, new Date(filter.startDate))
-            );
-          }
-          if (filter.endDate) {
-            conditions.push(
-              lte(DB.schema.comments.created_at, new Date(filter.endDate))
-            );
-          }
-
-          // Source filter (from comments table)
-          if (filter.source) {
-            conditions.push(eq(DB.schema.comments.source, filter.source));
-          }
-
-          // Business Unit filter (from insights table)
-          if (filter.businessUnit) {
-            conditions.push(
-              eq(DB.schema.insights.business_unit, filter.businessUnit)
-            );
-          }
-
-          // Insight filter
-          if (filter.insightId) {
-            conditions.push(eq(DB.schema.insights.id, filter.insightId));
-          }
-
-          // Intention type filter
-          if (filter.intentionType) {
-            conditions.push(
-              eq(DB.schema.intentions.type, filter.intentionType as any)
-            );
-          }
-
-          // Sentiment level filter
-          if (filter.sentimentLevels && filter.sentimentLevels.length > 0) {
-            conditions.push(
-              inArray(
-                DB.schema.sentiment_levels.level,
-                filter.sentimentLevels as any
-              )
-            );
-          }
-
-          // Confidence filter
-          if (filter.minConfidence) {
-            conditions.push(
-              gte(
-                DB.schema.comment_insights.confidence,
-                filter.minConfidence / 10
-              )
-            );
-          }
-        }
-
         // Apply where clause if conditions exist
-        if (conditions.length > 0) {
-          baseQuery.where(and(...conditions));
+        if (whereConditions) {
+          baseQuery.where(whereConditions);
         }
 
         // Execute query to get all data
@@ -245,8 +359,8 @@ export const v2CommentsRouter = router({
             )
           );
 
-        if (conditions.length > 0) {
-          countQuery.where(and(...conditions));
+        if (whereConditions) {
+          countQuery.where(whereConditions);
         }
 
         const [totalResult] = await countQuery;
@@ -292,6 +406,7 @@ export const v2CommentsRouter = router({
               name: row.insight_name,
               description: row.insight_description,
               business_unit: row.insight_business_unit,
+              operational_area: row.insight_operational_area,
               ai_generated: row.insight_ai_generated,
               confidence: row.ci_confidence,
               reasoning: row.ci_reasoning,

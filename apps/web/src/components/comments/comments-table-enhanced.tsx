@@ -1,5 +1,6 @@
 import { useMemo, useState, useEffect, useCallback } from "react";
 import { useDebounce } from "@/hooks/use-debounce";
+import { useAnalyticsFilters } from "@/hooks/use-analytics-filters";
 import { trpc } from "@/utils/trpc";
 import {
   ColumnDef,
@@ -30,14 +31,12 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
-import { format, subDays } from "date-fns";
+import { format } from "date-fns";
 import {
   ChevronLeft,
   ChevronRight,
   Search,
   ArrowUpDown,
-  Calendar as CalendarIcon,
   MessageSquare,
   Brain,
   Target,
@@ -45,13 +44,13 @@ import {
   AlertCircle,
   TrendingUp,
   X,
-  ChevronDown,
   Sparkles,
   Download,
-  Building2,
-  MapPin,
   SortDesc,
   FileText,
+  Building2,
+  MapPin,
+  PanelRightOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -61,6 +60,14 @@ import {
 } from "@/components/ui/tooltip";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+  SheetClose,
+} from "@/components/ui/sheet";
 import type { SharedTypes } from "types/shared";
 import { useQuery } from "@tanstack/react-query";
 
@@ -199,65 +206,55 @@ export function CommentsTableEnhanced({
   onCommentSelect,
   onExport,
 }: CommentsTableEnhancedProps) {
-  // State management
-  const [searchInput, setSearchInput] = useState("");
+  // Global analytics filters
+  const filters = useAnalyticsFilters();
+  // Local-only UI state
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(5);
-  const [sortBy, setSortBy] = useState<"created_at" | "updated_at">(
-    "created_at"
-  );
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
-
-  // Enhanced Filters
-  const [dateRange, setDateRange] = useState<{
-    from: Date | undefined;
-    to: Date | undefined;
-  }>({
-    from: undefined,
-    to: undefined,
-  });
-  const [selectedSentiments, setSelectedSentiments] = useState<string[]>([]);
-  const [selectedIntention, setSelectedIntention] = useState<
-    string | undefined
-  >();
-  const [selectedSource, setSelectedSource] = useState<string | undefined>();
-  const [selectedBusinessUnit, setSelectedBusinessUnit] = useState<
-    string | undefined
-  >();
-  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [openDrawer, setOpenDrawer] = useState(false);
+  const [drawerComment, setDrawerComment] =
+    useState<CommentWithRelations | null>(null);
 
   // Debounced search
-  const debouncedSearch = useDebounce(searchInput, 500);
+  const debouncedSearch = useDebounce(filters.searchText, 500);
 
   // Build query input
   const queryInput = useMemo(
     () => ({
-      limit: pageSize,
-      offset: (currentPage - 1) * pageSize,
+      limit: filters.limit,
+      offset: (currentPage - 1) * filters.limit,
       filter: {
         searchText: debouncedSearch || undefined,
-        startDate: dateRange.from,
-        endDate: dateRange.to,
+        startDate: filters.timeRange?.start,
+        endDate: filters.timeRange?.end,
         sentimentLevels:
-          selectedSentiments.length > 0 ? selectedSentiments : undefined,
-        intentionType: selectedIntention,
-        source: selectedSource,
-        businessUnit: selectedBusinessUnit,
+          filters.sentimentLevels.length > 0
+            ? filters.sentimentLevels
+            : undefined,
+        intentionType: filters.intentionType || undefined,
+        source: filters.source,
+        business_unit: filters.businessUnit,
+        operational_area: filters.operationalArea,
+        minConfidence: filters.minConfidence,
       },
-      sortBy,
-      sortOrder,
+      sortBy: (filters.sortBy === "created_at" ||
+      filters.sortBy === "updated_at"
+        ? filters.sortBy
+        : "created_at") as "created_at" | "updated_at",
+      sortOrder: filters.sortOrder,
     }),
     [
       currentPage,
-      pageSize,
+      filters.limit,
       debouncedSearch,
-      dateRange,
-      selectedSentiments,
-      selectedIntention,
-      selectedSource,
-      selectedBusinessUnit,
-      sortBy,
-      sortOrder,
+      filters.timeRange,
+      filters.sentimentLevels,
+      filters.intentionType,
+      filters.source,
+      filters.businessUnit,
+      filters.operationalArea,
+      filters.minConfidence,
+      filters.sortBy,
+      filters.sortOrder,
     ]
   );
 
@@ -267,50 +264,44 @@ export function CommentsTableEnhanced({
     isLoading,
     error,
     refetch,
-  } = useQuery(trpc.comments.listWithRelations.queryOptions(queryInput));
+  } = useQuery(trpc.v2Comments.listWithRelations.queryOptions(queryInput));
 
   // Reset page on filter change
   useEffect(() => {
     setCurrentPage(1);
   }, [
     debouncedSearch,
-    dateRange,
-    selectedSentiments,
-    selectedIntention,
-    selectedSource,
-    selectedBusinessUnit,
+    filters.timeRange,
+    filters.sentimentLevels,
+    filters.intentionType,
+    filters.source,
+    filters.businessUnit,
+    filters.limit,
+    filters.sortBy,
+    filters.sortOrder,
   ]);
 
   // Extract data from response
   const comments = response?.comments || [];
   const pagination = response?.pagination;
-  const totalPages = pagination ? Math.ceil(pagination.total / pageSize) : 0;
+  const totalPages = pagination
+    ? Math.ceil(pagination.total / filters.limit)
+    : 0;
 
-  // Toggle row expansion
-  const toggleRowExpansion = useCallback((commentId: string) => {
-    setExpandedRows((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(commentId)) {
-        newSet.delete(commentId);
-      } else {
-        newSet.add(commentId);
-      }
-      return newSet;
-    });
-  }, []);
+  // no inline expansion; details shown in drawer
 
   // Handle column sorting
   const handleSort = useCallback(
-    (field: typeof sortBy) => {
-      if (field === sortBy) {
-        setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
+    (field: "created_at" | "updated_at") => {
+      if (field === (filters.sortBy as any)) {
+        filters.setSortOrder(filters.sortOrder === "asc" ? "desc" : "asc");
       } else {
-        setSortBy(field);
-        setSortOrder("desc");
+        filters.setSortBy(field);
+        filters.setSortOrder("desc");
       }
       setCurrentPage(1);
     },
-    [sortBy]
+    [filters]
   );
 
   // Table columns with enhanced visual design
@@ -328,62 +319,16 @@ export function CommentsTableEnhanced({
         },
         cell: ({ row }) => {
           const comment = row.original;
-          const isExpanded = expandedRows.has(comment.id);
           const contentPreview =
-            comment.content.length > 150
-              ? comment.content.substring(0, 150) + "..."
+            comment.content.length > 140
+              ? comment.content.substring(0, 140) + "…"
               : comment.content;
 
           return (
-            <div className="max-w-2xl space-y-2">
-              <div
-                className={cn(
-                  "text-sm leading-relaxed cursor-pointer transition-colors text-ellipsis max-w-full whitespace-pre-wrap break-words",
-                  "text-foreground/90 hover:text-foreground",
-                  !isExpanded && "line-clamp-1"
-                )}
-                onClick={() => toggleRowExpansion(comment.id)}
-              >
-                <p className="text-sm leading-relaxed cursor-pointer transition-colors text-ellipsis max-w-full w-full whitespace-pre-wrap break-words">
-                  {isExpanded ? comment.content : contentPreview}
-                </p>
-              </div>
-
-              {/* Source and Business Unit badges */}
-              <div className="flex items-center gap-2">
-                {comment.source && (
-                  <Badge variant="secondary" className="text-xs gap-1">
-                    <MapPin className="h-3 w-3" />
-                    {comment.source}
-                  </Badge>
-                )}
-                {comment.insights?.[0]?.business_unit && (
-                  <Badge variant="secondary" className="text-xs gap-1">
-                    <Building2 className="h-3 w-3" />
-                    {comment.insights[0].business_unit}
-                  </Badge>
-                )}
-              </div>
-
-              {comment.content.length > 150 && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="mt-1 h-auto p-0 text-xs text-muted-foreground hover:text-primary"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleRowExpansion(comment.id);
-                  }}
-                >
-                  {isExpanded ? "Show less" : "Show more"}
-                  <ChevronDown
-                    className={cn(
-                      "ml-1 h-3 w-3 transition-transform",
-                      isExpanded && "rotate-180"
-                    )}
-                  />
-                </Button>
-              )}
+            <div className="max-w-lg w-full">
+              <p className="text-sm leading-relaxed text-foreground/90 truncate">
+                {contentPreview}
+              </p>
             </div>
           );
         },
@@ -413,32 +358,23 @@ export function CommentsTableEnhanced({
           );
 
           return (
-            <div className="space-y-2 max-w-full">
-              {/* Primary insight */}
-              <div className="p-2 rounded-md bg-muted/30 border border-border">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1">
-                    <Badge
-                      variant={
-                        primaryInsight.ai_generated ? "default" : "secondary"
-                      }
-                      className="text-xs font-medium mb-1"
-                    >
-                      {primaryInsight.ai_generated && (
-                        <Sparkles className="h-3 w-3 mr-1" />
-                      )}
-                      {primaryInsight.name}
-                    </Badge>
-                    <p className="text-xs text-muted-foreground line-clamp-2 mt-1">
-                      {primaryInsight.description}
-                    </p>
-                  </div>
+            <div className="space-y-2 w-full">
+              <div className="p-2 bg-muted/30 rounded-full">
+                <div className="flex items-center justify-between gap-1">
+                  <Badge
+                    variant={
+                      primaryInsight.ai_generated ? "default" : "secondary"
+                    }
+                    className="text-xs font-medium"
+                  >
+                    {primaryInsight.ai_generated && (
+                      <Sparkles className="h-3 w-3 mr-1" />
+                    )}
+                    {primaryInsight.name}
+                  </Badge>
                   {primaryInsight.confidence && (
-                    <div className="flex flex-col items-end gap-1">
-                      <span className="text-xs font-medium">
-                        {Math.round(primaryInsight.confidence * 10)}%
-                      </span>
-                      <div className="w-12 h-1.5 bg-muted rounded-full overflow-hidden">
+                    <div className="flex items-center gap-2">
+                      <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
                         <div
                           className="h-full bg-primary"
                           style={{
@@ -446,12 +382,13 @@ export function CommentsTableEnhanced({
                           }}
                         />
                       </div>
+                      <span className="text-xs text-muted-foreground">
+                        {Math.round(primaryInsight.confidence * 10)}%
+                      </span>
                     </div>
                   )}
                 </div>
               </div>
-
-              {/* Additional insights */}
               {insights.length > 1 && (
                 <Popover>
                   <PopoverTrigger asChild>
@@ -461,35 +398,22 @@ export function CommentsTableEnhanced({
                       className="h-auto p-1 text-xs hover:bg-muted"
                     >
                       <Brain className="h-3 w-3 mr-1" />+{insights.length - 1}{" "}
-                      more insight{insights.length > 2 ? "s" : ""}
+                      more
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-96 max-h-96 overflow-y-auto">
-                    <div className="space-y-3">
-                      <div className="font-semibold text-sm flex items-center gap-2">
-                        <Brain className="h-4 w-4" />
-                        All Insights ({insights.length})
-                      </div>
+                  <PopoverContent className="w-64">
+                    <div className="space-y-1">
                       {insights.map((insight, idx) => (
-                        <div key={idx} className="p-2 rounded border bg-card">
-                          <div className="flex items-center justify-between mb-1">
-                            <Badge
-                              variant={
-                                insight.ai_generated ? "default" : "secondary"
-                              }
-                              className="text-xs"
-                            >
-                              {insight.name}
-                            </Badge>
-                            {insight.confidence && (
-                              <span className="text-xs text-muted-foreground">
-                                {Math.round(insight.confidence * 10)}%
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-xs text-muted-foreground">
-                            {insight.description}
-                          </p>
+                        <div
+                          key={idx}
+                          className="flex items-center justify-between text-xs"
+                        >
+                          <span className="truncate">{insight.name}</span>
+                          {insight.confidence && (
+                            <span className="text-muted-foreground">
+                              {Math.round(insight.confidence * 10)}%
+                            </span>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -544,7 +468,6 @@ export function CommentsTableEnhanced({
 
           return (
             <div className="space-y-2">
-              {/* Sentiment badge */}
               <div
                 className={cn(
                   "p-2 rounded-md",
@@ -553,52 +476,36 @@ export function CommentsTableEnhanced({
                   "border-l-4"
                 )}
               >
-                <Badge
-                  className={cn(
-                    "text-xs font-medium mb-1",
-                    colors.text,
-                    "bg-transparent border-none p-0"
-                  )}
-                >
-                  {dominantSentiment.level}
-                </Badge>
-
-                {/* Intensity bar */}
-                <div className="flex items-center gap-1 w-full">
-                  <div className="h-1.5 bg-muted rounded-full overflow-hidden flex-1">
-                    <div
-                      className={cn(
-                        "h-full transition-all",
-                        colors.intensity >= 0 ? "bg-destructive" : "bg-chart-2"
-                      )}
-                      style={{ width: `${intensityPercent}%` }}
-                    />
+                <div className="flex items-center justify-between">
+                  <Badge
+                    className={cn(
+                      "text-xs font-medium",
+                      colors.text,
+                      "bg-transparent border-none p-0"
+                    )}
+                  >
+                    {dominantSentiment.level}
+                  </Badge>
+                  <div className="flex items-center gap-2 w-28">
+                    <div className="h-1.5 bg-muted rounded-full overflow-hidden flex-1">
+                      <div
+                        className={cn(
+                          "h-full transition-all",
+                          colors.intensity >= 0
+                            ? "bg-destructive"
+                            : "bg-chart-2"
+                        )}
+                        style={{ width: `${intensityPercent}%` }}
+                      />
+                    </div>
+                    {dominantSentiment.confidence && (
+                      <span className="text-xs text-muted-foreground">
+                        {Math.round(dominantSentiment.confidence * 10)}%
+                      </span>
+                    )}
                   </div>
-                  {dominantSentiment.confidence && (
-                    <span className="text-xs mt-1 block text-muted-foreground">
-                      {Math.round(dominantSentiment.confidence * 10)}%
-                    </span>
-                  )}
                 </div>
               </div>
-
-              {/* Emotional drivers */}
-              {dominantSentiment.drivers &&
-                dominantSentiment.drivers.length > 0 && (
-                  <div className="flex flex-wrap gap-1">
-                    {dominantSentiment.drivers
-                      .slice(0, 2)
-                      .map((driver, idx) => (
-                        <Badge
-                          key={idx}
-                          variant="outline"
-                          className="text-xs scale-90"
-                        >
-                          {driver}
-                        </Badge>
-                      ))}
-                  </div>
-                )}
             </div>
           );
         },
@@ -629,54 +536,130 @@ export function CommentsTableEnhanced({
           const Icon = intentionConfig.icon;
 
           return (
-            <div
-              className={cn(
-                "p-2 rounded-md space-y-2",
-                intentionConfig.bgColor
-              )}
-            >
-              <div className="flex items-center gap-2">
-                <Icon className={cn("h-4 w-4", intentionConfig.color)} />
-                <Badge
-                  variant="outline"
-                  className="text-xs border-none bg-transparent"
-                >
-                  {intention.primary_intention}
-                </Badge>
-              </div>
-
-              {/* Confidence meter */}
-              {intention.confidence && (
+            <div className={cn("p-2 rounded-md", intentionConfig.bgColor)}>
+              <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
-                  <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden max-w-[60px]">
-                    <div
-                      className="h-full bg-primary"
-                      style={{ width: `${intention.confidence * 10}%` }}
-                    />
-                  </div>
-                  <span className="text-xs text-muted-foreground">
-                    {Math.round(intention.confidence * 10)}%
-                  </span>
+                  <Icon className={cn("h-4 w-4", intentionConfig.color)} />
+                  <Badge
+                    variant="outline"
+                    className="text-xs border-none bg-transparent"
+                  >
+                    {intention.primary_intention}
+                  </Badge>
                 </div>
-              )}
-
-              {/* Secondary intentions */}
-              {intention.secondary_intentions &&
-                intention.secondary_intentions.length > 0 && (
-                  <div className="flex flex-wrap gap-1">
-                    {intention.secondary_intentions
-                      .slice(0, 2)
-                      .map((sec, idx) => (
-                        <Badge
-                          key={idx}
-                          variant="outline"
-                          className="text-xs scale-90 bg-white/30"
-                        >
-                          {sec}
-                        </Badge>
-                      ))}
+                {intention.confidence && (
+                  <div className="flex items-center gap-2">
+                    <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-primary"
+                        style={{ width: `${intention.confidence * 10}%` }}
+                      />
+                    </div>
+                    <span className="text-xs text-muted-foreground">
+                      {Math.round(intention.confidence * 10)}%
+                    </span>
                   </div>
                 )}
+              </div>
+            </div>
+          );
+        },
+      },
+      {
+        id: "context",
+        header: () => (
+          <div className="flex items-center gap-2">
+            <FileText className="h-4 w-4 text-muted-foreground" />
+            <span>Context</span>
+          </div>
+        ),
+        cell: ({ row }) => {
+          const comment = row.original as any;
+          const insights = (comment.insights || []) as any[];
+          const businessUnits: string[] = Array.from(
+            new Set(
+              insights
+                .map((i) => i.business_unit)
+                .filter((v): v is string => !!v)
+            )
+          );
+          const operationalAreas: string[] = Array.from(
+            new Set(
+              insights
+                .map((i) => i.operational_area)
+                .filter((v): v is string => !!v)
+            )
+          );
+          const source: string | undefined = comment.source || undefined;
+
+          const renderBadgeList = (
+            icon: React.ReactNode,
+            items: string[],
+            emptyLabel: string
+          ) => {
+            if (!items || items.length === 0) {
+              return (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  {icon}
+                  <span>{emptyLabel}</span>
+                </div>
+              );
+            }
+
+            const head = items.slice(0, 2);
+            const rest = items.slice(2);
+
+            return (
+              <div className="flex items-center gap-2 flex-wrap">
+                {icon}
+                {head.map((v) => (
+                  <Badge key={v} variant="outline" className="text-xs">
+                    {v}
+                  </Badge>
+                ))}
+                {rest.length > 0 && (
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Badge
+                        variant="secondary"
+                        className="text-xs cursor-pointer"
+                      >
+                        +{rest.length} more
+                      </Badge>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-56">
+                      <div className="space-y-1">
+                        {items.map((v) => (
+                          <div key={v} className="text-xs">
+                            {v}
+                          </div>
+                        ))}
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                )}
+              </div>
+            );
+          };
+
+          return (
+            <div className="space-y-2 min-w-[260px]">
+              <div className="flex items-center gap-3 flex-wrap">
+                {renderBadgeList(
+                  <Building2 className="h-3.5 w-3.5 text-muted-foreground" />,
+                  businessUnits,
+                  "No BU"
+                )}
+                {renderBadgeList(
+                  <MapPin className="h-3.5 w-3.5 text-muted-foreground" />,
+                  operationalAreas,
+                  "No area"
+                )}
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <MessageSquare className="h-3.5 w-3.5" />
+                  <span>{source || "No source"}</span>
+                </div>
+              </div>
             </div>
           );
         },
@@ -695,7 +678,9 @@ export function CommentsTableEnhanced({
               <SortDesc
                 className={cn(
                   "ml-2 h-4 w-4 transition-transform",
-                  sortBy === "created_at" && sortOrder === "asc" && "rotate-180"
+                  filters.sortBy === "created_at" &&
+                    filters.sortOrder === "asc" &&
+                    "rotate-180"
                 )}
               />
             </Button>
@@ -726,8 +711,33 @@ export function CommentsTableEnhanced({
           );
         },
       },
+      {
+        id: "view",
+        header: () => <span className="sr-only">View</span>,
+        cell: ({ row }) => (
+          <div className="flex justify-end">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setDrawerComment(row.original);
+                    setOpenDrawer(true);
+                  }}
+                >
+                  <PanelRightOpen className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>View details</TooltipContent>
+            </Tooltip>
+          </div>
+        ),
+      },
     ],
-    [expandedRows, sortBy, sortOrder, handleSort, toggleRowExpansion]
+    [filters.sortBy, filters.sortOrder, handleSort]
   );
 
   // Table instance
@@ -741,24 +751,18 @@ export function CommentsTableEnhanced({
     pageCount: totalPages,
   });
 
-  // Clear all filters
+  // Clear only table-owned filters (keep global bar filters)
   const clearAllFilters = () => {
-    setSearchInput("");
-    setDateRange({ from: undefined, to: undefined });
-    setSelectedSentiments([]);
-    setSelectedIntention(undefined);
-    setSelectedSource(undefined);
-    setSelectedBusinessUnit(undefined);
+    filters.setSearchText("");
+    filters.setSentimentLevels([]);
+    filters.setIntentionType(undefined);
+    setCurrentPage(1);
   };
 
   const hasActiveFilters =
-    searchInput ||
-    dateRange.from ||
-    dateRange.to ||
-    selectedSentiments.length > 0 ||
-    selectedIntention ||
-    selectedSource ||
-    selectedBusinessUnit;
+    !!filters.searchText ||
+    filters.sentimentLevels.length > 0 ||
+    !!filters.intentionType;
 
   // Loading state
   if (isLoading) {
@@ -813,85 +817,23 @@ export function CommentsTableEnhanced({
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               placeholder="Search comments..."
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
+              value={filters.searchText}
+              onChange={(e) => filters.setSearchText(e.target.value)}
               className="pl-9"
             />
-            {searchInput && (
+            {filters.searchText && (
               <Button
                 variant="ghost"
                 size="sm"
                 className="absolute right-1 top-1/2 -translate-y-1/2 h-7 px-2"
-                onClick={() => setSearchInput("")}
+                onClick={() => filters.setSearchText("")}
               >
                 <X className="h-3 w-3" />
               </Button>
             )}
           </div>
 
-          {/* Date Range Picker */}
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                className="justify-start text-left font-normal"
-              >
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {dateRange.from ? (
-                  dateRange.to ? (
-                    <>
-                      {format(dateRange.from, "MMM d")} -{" "}
-                      {format(dateRange.to, "MMM d, yyyy")}
-                    </>
-                  ) : (
-                    format(dateRange.from, "MMM d, yyyy")
-                  )
-                ) : (
-                  <span className="text-muted-foreground">
-                    Pick a date range
-                  </span>
-                )}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <div className="p-3 border-b">
-                <div className="grid grid-cols-2 gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() =>
-                      setDateRange({
-                        from: subDays(new Date(), 7),
-                        to: new Date(),
-                      })
-                    }
-                  >
-                    Last 7 days
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() =>
-                      setDateRange({
-                        from: subDays(new Date(), 30),
-                        to: new Date(),
-                      })
-                    }
-                  >
-                    Last 30 days
-                  </Button>
-                </div>
-              </div>
-              <Calendar
-                mode="range"
-                selected={dateRange}
-                onSelect={(range: any) =>
-                  setDateRange(range || { from: undefined, to: undefined })
-                }
-                initialFocus
-              />
-            </PopoverContent>
-          </Popover>
+          {/* Date range moved to global filter bar */}
 
           {/* Export button */}
           <Button
@@ -912,7 +854,7 @@ export function CommentsTableEnhanced({
             <span className="text-sm text-muted-foreground">Sentiment:</span>
             <div className="flex flex-wrap gap-1">
               {Object.entries(sentimentColors).map(([sentiment, colors]) => {
-                const isActive = selectedSentiments.includes(sentiment);
+                const isActive = filters.sentimentLevels.includes(sentiment);
 
                 return (
                   <Badge
@@ -927,11 +869,14 @@ export function CommentsTableEnhanced({
                     )}
                     onClick={() => {
                       if (isActive) {
-                        setSelectedSentiments((prev) =>
-                          prev.filter((s) => s !== sentiment)
+                        filters.setSentimentLevels(
+                          filters.sentimentLevels.filter((s) => s !== sentiment)
                         );
                       } else {
-                        setSelectedSentiments((prev) => [...prev, sentiment]);
+                        filters.setSentimentLevels([
+                          ...filters.sentimentLevels,
+                          sentiment,
+                        ]);
                       }
                     }}
                   >
@@ -945,58 +890,18 @@ export function CommentsTableEnhanced({
           {/* Divider */}
           <div className="h-6 w-px bg-border" />
 
-          {/* Source Filter */}
-          <Select value={selectedSource} onValueChange={setSelectedSource}>
-            <SelectTrigger className="w-[140px] h-7">
-              <MapPin className="h-3 w-3 mr-1" />
-              <SelectValue placeholder="All sources" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All sources</SelectItem>
-              <SelectItem value="web">NPS</SelectItem>
-              <SelectItem value="social">App Store</SelectItem>
-              <SelectItem value="review">Scouting</SelectItem>
-              <SelectItem value="nps-relacional">NPS-relacional</SelectItem>
-            </SelectContent>
-          </Select>
+          {/* Source filter moved to global filter bar */}
 
-          {/* Business Unit Filter */}
-          <Select
-            value={selectedBusinessUnit}
-            onValueChange={setSelectedBusinessUnit}
-          >
-            <SelectTrigger className="w-[160px] h-7">
-              <Building2 className="h-3 w-3 mr-1" />
-              <SelectValue placeholder="All units" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All units</SelectItem>
-              <SelectItem value="bu_teens_kids">BU Teens & Kids</SelectItem>
-              <SelectItem value="bu_core_banking">BU Core Banking</SelectItem>
-              <SelectItem value="sin_equipo">Sin equipo</SelectItem>
-              <SelectItem value="bu_pasivos_activos_digitales">
-                BU Pasivos y activos digitales
-              </SelectItem>
-              <SelectItem value="bu_engagement">BU Engagement</SelectItem>
-              <SelectItem value="ux_ui">UX/UI</SelectItem>
-              <SelectItem value="bu_growth">BU Growth</SelectItem>
-              <SelectItem value="bu_activos_seguros">
-                BU Activos y seguros
-              </SelectItem>
-              <SelectItem value="bu_payments">BU Payments</SelectItem>
-              <SelectItem value="null">null</SelectItem>
-              <SelectItem value="customer_centricity">
-                Customer Centricity
-              </SelectItem>
-              <SelectItem value="caixabank_tech">CaixaBank Tech</SelectItem>
-              <SelectItem value="caixabank">CaixaBank</SelectItem>
-            </SelectContent>
-          </Select>
+          {/* Business unit filter moved to global filter bar */}
 
           {/* Intention Filter */}
           <Select
-            value={selectedIntention}
-            onValueChange={setSelectedIntention}
+            value={filters.intentionType || undefined}
+            onValueChange={(val) =>
+              val === "all"
+                ? filters.setIntentionType(undefined)
+                : filters.setIntentionType(val)
+            }
           >
             <SelectTrigger className="w-[150px] h-7">
               <Target className="h-3 w-3 mr-1" />
@@ -1043,12 +948,16 @@ export function CommentsTableEnhanced({
             </>
           )}
         </div>
+        <div className="text-xs text-muted-foreground hidden sm:flex items-center gap-2">
+          <PanelRightOpen className="h-3.5 w-3.5" />
+          <span>Click a row or the icon to view details</span>
+        </div>
       </div>
 
       {/* Table */}
-      <div className="rounded-md border overflow-hidden">
-        <ScrollArea className="w-full">
-          <Table>
+      <div className="rounded-md border">
+        <div className="w-full overflow-x-auto">
+          <Table className="w-full max-h-[500px] h-full overflow-auto">
             <TableHeader className="bg-muted/50">
               {table.getHeaderGroups().map((headerGroup) => (
                 <TableRow key={headerGroup.id} className="hover:bg-transparent">
@@ -1073,11 +982,15 @@ export function CommentsTableEnhanced({
                     <TableRow
                       key={row.id}
                       className={cn(
-                        "cursor-pointer transition-colors",
+                        "cursor-pointer transition-colors border-border/60",
                         isEven && "bg-muted/5",
                         "hover:bg-muted/10"
                       )}
-                      onClick={() => onCommentSelect?.(row.original.id)}
+                      onClick={() => {
+                        setDrawerComment(row.original);
+                        setOpenDrawer(true);
+                        onCommentSelect?.(row.original.id);
+                      }}
                     >
                       {row.getVisibleCells().map((cell) => (
                         <TableCell key={cell.id} className="align-top">
@@ -1118,7 +1031,7 @@ export function CommentsTableEnhanced({
               )}
             </TableBody>
           </Table>
-        </ScrollArea>
+        </div>
       </div>
 
       {/* Enhanced Pagination Controls */}
@@ -1132,9 +1045,9 @@ export function CommentsTableEnhanced({
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground">Show:</span>
               <Select
-                value={pageSize.toString()}
+                value={String(filters.limit)}
                 onValueChange={(value) => {
-                  setPageSize(Number(value));
+                  filters.setLimit(Number(value));
                   setCurrentPage(1);
                 }}
               >
@@ -1226,6 +1139,216 @@ export function CommentsTableEnhanced({
           </div>
         </div>
       )}
+
+      {/* Side Drawer for details */}
+      <Sheet open={openDrawer} onOpenChange={setOpenDrawer}>
+        <SheetContent side="right" className="w-[680px] sm:w-[760px] ">
+          <SheetHeader>
+            <SheetTitle>Comment Details</SheetTitle>
+            <SheetDescription>Full analysis and context</SheetDescription>
+          </SheetHeader>
+          {drawerComment && (
+            <ScrollArea className="h-full w-full px-4 py-4">
+              <div className="space-y-6">
+                {/* Comment */}
+                <div className="space-y-3">
+                  <div className="text-xs text-muted-foreground">Comment</div>
+                  <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
+                    {drawerComment.content}
+                  </p>
+                  <div className="text-xs text-muted-foreground">
+                    {format(
+                      new Date(drawerComment.created_at),
+                      "MMM d, yyyy h:mm a"
+                    )}
+                  </div>
+                </div>
+
+                {/* Context */}
+                <div className="space-y-3">
+                  <div className="text-xs text-muted-foreground">Context</div>
+                  <div className="flex flex-wrap gap-2">
+                    {Array.from(
+                      new Set(
+                        (drawerComment.insights || [])
+                          .map((i: any) => i.business_unit)
+                          .filter(Boolean)
+                      )
+                    ).map((v: string) => (
+                      <Badge key={v} variant="secondary" className="text-xs">
+                        {v}
+                      </Badge>
+                    ))}
+                    {Array.from(
+                      new Set(
+                        (drawerComment.insights || [])
+                          .map((i: any) => i.operational_area)
+                          .filter(Boolean)
+                      )
+                    ).map((v: string) => (
+                      <Badge key={v} variant="secondary" className="text-xs">
+                        {v}
+                      </Badge>
+                    ))}
+                    <Badge variant="outline" className="text-xs">
+                      {drawerComment.source || "No source"}
+                    </Badge>
+                  </div>
+                </div>
+
+                {/* Insights */}
+                {(drawerComment.insights?.length ?? 0) > 0 && (
+                  <div className="space-y-4">
+                    <div className="text-xs text-muted-foreground">
+                      Insights
+                    </div>
+                    {(drawerComment.insights || []).map(
+                      (insight: any, idx: number) => (
+                        <div
+                          key={idx}
+                          className="border rounded-lg p-3 space-y-3 bg-card w-full"
+                        >
+                          <div className="flex items-center justify-between">
+                            <Badge
+                              variant={
+                                insight.ai_generated ? "default" : "secondary"
+                              }
+                            >
+                              {insight.name}
+                            </Badge>
+                            {insight.confidence && (
+                              <span className="text-xs text-muted-foreground">
+                                {Math.round(insight.confidence * 10)}%
+                              </span>
+                            )}
+                          </div>
+                          {insight.description && (
+                            <p className="text-xs text-muted-foreground">
+                              {insight.description}
+                            </p>
+                          )}
+                          {insight.sentiment_level && (
+                            <div className="pt-2 border-t">
+                              <div className="text-xs font-medium mb-1">
+                                Sentiment
+                              </div>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <Badge variant="outline" className="text-xs">
+                                  {insight.sentiment_level} (
+                                  {insight.sentiment_name})
+                                </Badge>
+                                {insight.sentiment_confidence && (
+                                  <span className="text-xs text-muted-foreground">
+                                    {Math.round(
+                                      insight.sentiment_confidence * 10
+                                    )}
+                                    %
+                                  </span>
+                                )}
+                                {Array.isArray(insight.emotional_drivers) &&
+                                  insight.emotional_drivers.length > 0 && (
+                                    <div className="flex gap-1 flex-wrap">
+                                      {insight.emotional_drivers.map(
+                                        (d: string, i: number) => (
+                                          <Badge
+                                            key={i}
+                                            variant="outline"
+                                            className="text-[10px]"
+                                          >
+                                            {d}
+                                          </Badge>
+                                        )
+                                      )}
+                                    </div>
+                                  )}
+                              </div>
+                              {insight.sentiment_reasoning && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {insight.sentiment_reasoning}
+                                </p>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    )}
+                  </div>
+                )}
+
+                {/* Intention */}
+                {(drawerComment as any).intention && (
+                  <div className="space-y-3">
+                    <div className="text-xs text-muted-foreground">
+                      Intention
+                    </div>
+                    <div className="border rounded-lg p-3 space-y-3 bg-card">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Badge variant="default">
+                            {(drawerComment as any).intention.type}
+                          </Badge>
+                          <span className="text-sm font-medium">
+                            {(drawerComment as any).intention.primary_intention}
+                          </span>
+                        </div>
+                        {(drawerComment as any).intention.confidence && (
+                          <span className="text-xs text-muted-foreground">
+                            {Math.round(
+                              (drawerComment as any).intention.confidence * 10
+                            )}
+                            %
+                          </span>
+                        )}
+                      </div>
+                      {(drawerComment as any).intention.description && (
+                        <p className="text-sm text-muted-foreground">
+                          {(drawerComment as any).intention.description}
+                        </p>
+                      )}
+                      {Array.isArray(
+                        (drawerComment as any).intention.secondary_intentions
+                      ) &&
+                        (drawerComment as any).intention.secondary_intentions
+                          .length > 0 && (
+                          <div className="pt-2 border-t">
+                            <div className="text-xs font-medium mb-1">
+                              Secondary
+                            </div>
+                            <div className="flex gap-1 flex-wrap">
+                              {(
+                                drawerComment as any
+                              ).intention.secondary_intentions.map(
+                                (s: string, i: number) => (
+                                  <Badge
+                                    key={i}
+                                    variant="outline"
+                                    className="text-xs"
+                                  >
+                                    {s}
+                                  </Badge>
+                                )
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      {(drawerComment as any).intention.reasoning && (
+                        <div className="pt-2 border-t">
+                          <div className="text-xs font-medium mb-1">
+                            AI Reasoning
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            {(drawerComment as any).intention.reasoning}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </ScrollArea>
+          )}
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
