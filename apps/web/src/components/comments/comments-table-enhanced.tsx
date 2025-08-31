@@ -950,7 +950,7 @@ export function CommentsTableEnhanced({
       {/* Table */}
       <div className="rounded-md border">
         <div className="w-full overflow-x-auto">
-          <Table className=" max-h-[500px]  w-[] overflow-auto">
+          <Table className=" max-h-[500px]  w-full max-w-lg overflow-auto">
             <TableHeader className="bg-muted/50">
               {table.getHeaderGroups().map((headerGroup) => (
                 <TableRow key={headerGroup.id} className="hover:bg-transparent">
@@ -967,7 +967,7 @@ export function CommentsTableEnhanced({
                 </TableRow>
               ))}
             </TableHeader>
-            <TableBody className="max-h-[200px] overflow-auto">
+            <TableBody>
               {table.getRowModel().rows?.length ? (
                 table.getRowModel().rows.map((row, index) => {
                   const isEven = index % 2 === 0;

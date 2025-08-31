@@ -41,12 +41,14 @@ export const LetiDashboard: React.FC<LetiDashboardProps> = ({ className }) => {
       <div id="leti-key-insight">
         <LetiKeyInsights />
       </div> */}
-      <DataCard className="w-full">
+      <DataCard className="w-full ">
         <DataCard.Header
           title="Comments"
           description="Comments from the AI Agent"
         />
-        <CommentsTableEnhanced />
+        <div className="h-[500px] p-4 max-w-[1400px] mx-auto overflow-auto">
+          <CommentsTableEnhanced />
+        </div>
       </DataCard>
     </div>
   );
