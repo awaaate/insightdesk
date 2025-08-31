@@ -66,7 +66,7 @@ function RouteComponent() {
   };
 
   return (
-    <div className="h-full w-max bg-gradient-to-br from-background via-background to-muted/20">
+    <div className="h-full w-full bg-gradient-to-br from-background via-background to-muted/20">
       {isChatOpen ? (
         <ResizablePanelGroup
           direction="horizontal"

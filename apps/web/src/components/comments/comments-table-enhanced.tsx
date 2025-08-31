@@ -60,14 +60,7 @@ import {
 } from "@/components/ui/tooltip";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-  SheetClose,
-} from "@/components/ui/sheet";
+import { CommentDetailsDrawer } from "@/components/comments/comment-details-drawer";
 import type { SharedTypes } from "types/shared";
 import { useQuery } from "@tanstack/react-query";
 
@@ -957,7 +950,7 @@ export function CommentsTableEnhanced({
       {/* Table */}
       <div className="rounded-md border">
         <div className="w-full overflow-x-auto">
-          <Table className="w-full max-h-[500px] h-full overflow-auto">
+          <Table className=" max-h-[500px]  w-[] overflow-auto">
             <TableHeader className="bg-muted/50">
               {table.getHeaderGroups().map((headerGroup) => (
                 <TableRow key={headerGroup.id} className="hover:bg-transparent">
@@ -974,7 +967,7 @@ export function CommentsTableEnhanced({
                 </TableRow>
               ))}
             </TableHeader>
-            <TableBody>
+            <TableBody className="max-h-[200px] overflow-auto">
               {table.getRowModel().rows?.length ? (
                 table.getRowModel().rows.map((row, index) => {
                   const isEven = index % 2 === 0;
@@ -1140,215 +1133,11 @@ export function CommentsTableEnhanced({
         </div>
       )}
 
-      {/* Side Drawer for details */}
-      <Sheet open={openDrawer} onOpenChange={setOpenDrawer}>
-        <SheetContent side="right" className="w-[680px] sm:w-[760px] ">
-          <SheetHeader>
-            <SheetTitle>Comment Details</SheetTitle>
-            <SheetDescription>Full analysis and context</SheetDescription>
-          </SheetHeader>
-          {drawerComment && (
-            <ScrollArea className="h-full w-full px-4 py-4">
-              <div className="space-y-6">
-                {/* Comment */}
-                <div className="space-y-3">
-                  <div className="text-xs text-muted-foreground">Comment</div>
-                  <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
-                    {drawerComment.content}
-                  </p>
-                  <div className="text-xs text-muted-foreground">
-                    {format(
-                      new Date(drawerComment.created_at),
-                      "MMM d, yyyy h:mm a"
-                    )}
-                  </div>
-                </div>
-
-                {/* Context */}
-                <div className="space-y-3">
-                  <div className="text-xs text-muted-foreground">Context</div>
-                  <div className="flex flex-wrap gap-2">
-                    {Array.from(
-                      new Set(
-                        (drawerComment.insights || [])
-                          .map((i: any) => i.business_unit)
-                          .filter(Boolean)
-                      )
-                    ).map((v: string) => (
-                      <Badge key={v} variant="secondary" className="text-xs">
-                        {v}
-                      </Badge>
-                    ))}
-                    {Array.from(
-                      new Set(
-                        (drawerComment.insights || [])
-                          .map((i: any) => i.operational_area)
-                          .filter(Boolean)
-                      )
-                    ).map((v: string) => (
-                      <Badge key={v} variant="secondary" className="text-xs">
-                        {v}
-                      </Badge>
-                    ))}
-                    <Badge variant="outline" className="text-xs">
-                      {drawerComment.source || "No source"}
-                    </Badge>
-                  </div>
-                </div>
-
-                {/* Insights */}
-                {(drawerComment.insights?.length ?? 0) > 0 && (
-                  <div className="space-y-4">
-                    <div className="text-xs text-muted-foreground">
-                      Insights
-                    </div>
-                    {(drawerComment.insights || []).map(
-                      (insight: any, idx: number) => (
-                        <div
-                          key={idx}
-                          className="border rounded-lg p-3 space-y-3 bg-card w-full"
-                        >
-                          <div className="flex items-center justify-between">
-                            <Badge
-                              variant={
-                                insight.ai_generated ? "default" : "secondary"
-                              }
-                            >
-                              {insight.name}
-                            </Badge>
-                            {insight.confidence && (
-                              <span className="text-xs text-muted-foreground">
-                                {Math.round(insight.confidence * 10)}%
-                              </span>
-                            )}
-                          </div>
-                          {insight.description && (
-                            <p className="text-xs text-muted-foreground">
-                              {insight.description}
-                            </p>
-                          )}
-                          {insight.sentiment_level && (
-                            <div className="pt-2 border-t">
-                              <div className="text-xs font-medium mb-1">
-                                Sentiment
-                              </div>
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <Badge variant="outline" className="text-xs">
-                                  {insight.sentiment_level} (
-                                  {insight.sentiment_name})
-                                </Badge>
-                                {insight.sentiment_confidence && (
-                                  <span className="text-xs text-muted-foreground">
-                                    {Math.round(
-                                      insight.sentiment_confidence * 10
-                                    )}
-                                    %
-                                  </span>
-                                )}
-                                {Array.isArray(insight.emotional_drivers) &&
-                                  insight.emotional_drivers.length > 0 && (
-                                    <div className="flex gap-1 flex-wrap">
-                                      {insight.emotional_drivers.map(
-                                        (d: string, i: number) => (
-                                          <Badge
-                                            key={i}
-                                            variant="outline"
-                                            className="text-[10px]"
-                                          >
-                                            {d}
-                                          </Badge>
-                                        )
-                                      )}
-                                    </div>
-                                  )}
-                              </div>
-                              {insight.sentiment_reasoning && (
-                                <p className="text-xs text-muted-foreground mt-1">
-                                  {insight.sentiment_reasoning}
-                                </p>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      )
-                    )}
-                  </div>
-                )}
-
-                {/* Intention */}
-                {(drawerComment as any).intention && (
-                  <div className="space-y-3">
-                    <div className="text-xs text-muted-foreground">
-                      Intention
-                    </div>
-                    <div className="border rounded-lg p-3 space-y-3 bg-card">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <Badge variant="default">
-                            {(drawerComment as any).intention.type}
-                          </Badge>
-                          <span className="text-sm font-medium">
-                            {(drawerComment as any).intention.primary_intention}
-                          </span>
-                        </div>
-                        {(drawerComment as any).intention.confidence && (
-                          <span className="text-xs text-muted-foreground">
-                            {Math.round(
-                              (drawerComment as any).intention.confidence * 10
-                            )}
-                            %
-                          </span>
-                        )}
-                      </div>
-                      {(drawerComment as any).intention.description && (
-                        <p className="text-sm text-muted-foreground">
-                          {(drawerComment as any).intention.description}
-                        </p>
-                      )}
-                      {Array.isArray(
-                        (drawerComment as any).intention.secondary_intentions
-                      ) &&
-                        (drawerComment as any).intention.secondary_intentions
-                          .length > 0 && (
-                          <div className="pt-2 border-t">
-                            <div className="text-xs font-medium mb-1">
-                              Secondary
-                            </div>
-                            <div className="flex gap-1 flex-wrap">
-                              {(
-                                drawerComment as any
-                              ).intention.secondary_intentions.map(
-                                (s: string, i: number) => (
-                                  <Badge
-                                    key={i}
-                                    variant="outline"
-                                    className="text-xs"
-                                  >
-                                    {s}
-                                  </Badge>
-                                )
-                              )}
-                            </div>
-                          </div>
-                        )}
-                      {(drawerComment as any).intention.reasoning && (
-                        <div className="pt-2 border-t">
-                          <div className="text-xs font-medium mb-1">
-                            AI Reasoning
-                          </div>
-                          <p className="text-xs text-muted-foreground">
-                            {(drawerComment as any).intention.reasoning}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </ScrollArea>
-          )}
-        </SheetContent>
-      </Sheet>
+      <CommentDetailsDrawer
+        open={openDrawer}
+        onOpenChange={setOpenDrawer}
+        comment={drawerComment}
+      />
     </div>
   );
 }

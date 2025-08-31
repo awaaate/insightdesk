@@ -75,7 +75,7 @@ const defaultFilters: Omit<
   operationalArea: [],
   source: [],
   minComments: 5,
-  limit: 20,
+  limit: 5,
   searchText: "",
   sentimentLevels: [],
   intentionType: undefined,

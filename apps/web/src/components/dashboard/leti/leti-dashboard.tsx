@@ -46,9 +46,7 @@ export const LetiDashboard: React.FC<LetiDashboardProps> = ({ className }) => {
           title="Comments"
           description="Comments from the AI Agent"
         />
-        <div className="h-[500px] p-4 max-w-full overflow-auto">
-          <CommentsTableEnhanced />
-        </div>
+        <CommentsTableEnhanced />
       </DataCard>
     </div>
   );
