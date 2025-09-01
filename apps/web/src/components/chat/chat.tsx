@@ -101,14 +101,15 @@ export const Chat = () => {
           <div className="py-4 space-y-4">
             {showWelcome ? (
               <div className="flex flex-col items-center justify-center min-h-[calc(100vh-400px)] text-center">
-                <img
-                  src={`${
-                    import.meta.env.VITE_SERVER_URL
-                  }/assets/mascota-colgada.webp`}
-                  alt="Leti mascot"
-                  className="h-24 w-24 text-primary -mb-6 relative z-10"
-                />
-                <div className="flex flex-col items-center justify-center bg-card p-4 py-8 rounded-xl shadow-lg border">
+                <div className="relative flex flex-col items-center">
+                  <img
+                    src={`${
+                      import.meta.env.VITE_SERVER_URL
+                    }/assets/nueva-mascota.png`}
+                    alt="Leti mascot"
+                    className="h-28 w-44 mb-[-2rem] relative z-10 object-contain"
+                  />
+                  <div className="flex flex-col items-center justify-center bg-card p-6 pt-7 pb-8 rounded-xl shadow-lg border min-w-[500px]">
                   <h3 className="text-lg font-semibold mb-2">
                     ¡ Tus Agentes de lA listos para charlar !
                   </h3>
@@ -133,6 +134,7 @@ export const Chat = () => {
                       </Button>
                     ))}
                   </div>
+                </div>
                 </div>
               </div>
             ) : (
