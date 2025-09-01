@@ -13,7 +13,8 @@
     "db:studio": "drizzle-kit studio",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:seed": "concurrently \"bun src/db/seed-insights.ts\" \"bun src/db/seed-intentions.ts\" \"bun src/db/seed-sentiment-levels.ts\"",
+    "db:seed": "bun seed.ts",
+    "db:seed:comments": "bun seed-comments.ts",
     "cli": "bun src/cli/index.ts",
     "clean": "rm -rf node_modules && rm -rf dist && rm -rf .turbo"
   },

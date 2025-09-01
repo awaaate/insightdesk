@@ -29,6 +29,46 @@ export const commentsRouter = router({
       };
     }),
 
+  // List only comment IDs (simple, paginated)
+  listIds: publicProcedure
+    .input(
+      z
+        .object({
+          limit: z.number().min(1).max(1000).default(500),
+          offset: z.number().min(0).default(0),
+        })
+        .optional()
+    )
+    .query(async ({ ctx, input }) => {
+      const limit = input?.limit ?? 500;
+      const offset = input?.offset ?? 0;
+
+      // Fetch IDs page
+      const rows = await ctx.db
+        .select({ id: DB.schema.comments.id })
+        .from(DB.schema.comments)
+        .limit(limit)
+        .offset(offset);
+
+      // Total count
+      const [countRow] = await ctx.db
+        .select({ count: sql<number>`count(${DB.schema.comments.id})` })
+        .from(DB.schema.comments);
+
+      const total = Number((countRow as any)?.count ?? 0);
+      const ids = rows.map((r) => r.id).filter(Boolean) as string[];
+
+      return {
+        ids,
+        pagination: {
+          total,
+          limit,
+          offset,
+          hasMore: offset + ids.length < total,
+        },
+      };
+    }),
+
   // List comments with all relations using INNER JOINs
   listWithRelations: publicProcedure
     .input(SharedTypes.Domain.Comment.ExtendedListInputSchema)

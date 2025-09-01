@@ -890,6 +890,7 @@ async function main() {
       message: "¿Qué deseas hacer?",
       choices: [
         { title: "💬 Crear y Procesar Comentarios", value: "create" },
+        { title: "⚙️  Procesar TODOS los comentarios", value: "processAll" },
         { title: "🧠 Ver Insights", value: "insights" },
         { title: "📡 Monitor en Tiempo Real", value: "monitor" },
         { title: "📊 Ver Estadísticas", value: "stats" },
@@ -924,6 +925,10 @@ async function main() {
 
       case "insights":
         await viewInsights();
+        break;
+
+      case "processAll":
+        await processAllComments();
         break;
 
       case "monitor":
@@ -1030,3 +1035,67 @@ main().catch((error) => {
   console.error(chalk.red("❌ Error fatal:"), error);
   process.exit(1);
 });
+
+// Process all existing comments in DB
+async function processAllComments() {
+  const spinner = ora("Obteniendo todos los IDs de comentarios...").start();
+
+  try {
+    const PAGE_SIZE = 1000;
+    let offset = 0;
+    let allIds: string[] = [];
+    let total = 0;
+
+    // Paginado para evitar cargas muy grandes
+    while (true) {
+      const { ids, pagination } = await trpc.comments.listIds.query({
+        limit: PAGE_SIZE,
+        offset,
+      });
+
+      if (offset === 0) total = pagination.total;
+      allIds.push(...ids);
+      offset += PAGE_SIZE;
+
+      if (!pagination.hasMore) break;
+    }
+
+    spinner.succeed(`Se encontraron ${total} comentarios en total`);
+
+    if (allIds.length === 0) {
+      console.log(chalk.yellow("\n⚠ No hay comentarios para procesar"));
+      return;
+    }
+
+    // Confirmación antes de lanzar análisis masivo
+    console.log(chalk.blue("\nResumen:"));
+    const table = new Table({
+      head: [chalk.cyan("Métrica"), chalk.cyan("Valor")],
+      style: { head: [], border: [] },
+    });
+    table.push(
+      ["Total de comentarios", chalk.yellow(allIds.length.toString())],
+      ["Tamaño de lote (backend)", chalk.blue("automático")],
+      ["Acción", chalk.white("Analizar con IA (LETI/GRO/PIX)")]
+    );
+    console.log("\n" + table.toString());
+
+    const { confirm } = await prompts({
+      type: "confirm",
+      name: "confirm",
+      message: `¿Procesar ${allIds.length} comentarios ahora?`,
+      initial: false,
+    });
+
+    if (!confirm) {
+      console.log(chalk.gray("Operación cancelada por el usuario"));
+      return;
+    }
+
+    // Reusar flujo de procesamiento y monitoreo existente
+    await processAndMonitor(allIds);
+  } catch (error) {
+    spinner.fail("Error al obtener los IDs o procesar comentarios");
+    console.error(chalk.red("Detalles:"), error);
+  }
+}
