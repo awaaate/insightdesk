@@ -15,6 +15,9 @@
     "db:migrate": "drizzle-kit migrate",
     "db:seed": "bun seed.ts",
     "db:seed:comments": "bun seed-comments.ts",
+    "db:seed:all": "concurrently \"bun src/db/seed-insights.ts\" \"bun src/db/seed-intentions.ts\" \"bun src/db/seed-sentiment-levels.ts\"",
+    "db:reset": "bun src/db/reset-database.ts",
+    "db:fresh": "bun src/db/reset-database.ts && bun run db:seed",
     "cli": "bun src/cli/index.ts",
     "clean": "rm -rf node_modules && rm -rf dist && rm -rf .turbo"
   },
