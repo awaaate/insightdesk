@@ -247,10 +247,7 @@ const SentimentDistributionPie: React.FC<{
   }, [chartData]);
 
   return (
-    <div className="flex-1 flex flex-col border-l">
-      <h3 className="text-muted-foreground/60 text-sm text-center mt-4">
-        Top 10 patterns by occurrence
-      </h3>
+    <div className="flex h-full">
       <div className="flex-1 flex flex-col items-center justify-center">
         <DonutChart
           data={chartData}
@@ -450,10 +447,10 @@ export const SentimentDistribution: React.FC<SentimentDistributionProps> = ({
             <TabsTrigger value="list">List</TabsTrigger>
             <TabsTrigger value="pie">Pie</TabsTrigger>
           </TabsList>
-          <TabsContent value="list">
+          <TabsContent value="list" className="mt-4 h-[300px]">
             <SentimentLevelsList className="flex-1" />
           </TabsContent>
-          <TabsContent value="pie">
+          <TabsContent value="pie" className="mt-4 h-[300px]">
             <SentimentDistributionPie data={data} />
           </TabsContent>
         </Tabs>

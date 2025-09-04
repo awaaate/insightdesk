@@ -26,7 +26,7 @@ export const LetiDashboard: React.FC<LetiDashboardProps> = ({ className }) => {
 
       {/* Key Insights Summary - Second Row */}
       <KeyInsightsSummary />
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 gap-4 items-stretch">
         <TopInsightsSection />
         <SentimentDistribution />
       </div>

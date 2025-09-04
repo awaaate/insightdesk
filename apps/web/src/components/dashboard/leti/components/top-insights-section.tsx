@@ -168,7 +168,7 @@ const InsightsChart: React.FC<{
   }, [chartData]);
 
   return (
-    <div className="flex-1 flex h-full">
+    <div className="flex h-full">
       <div className="flex-1 flex flex-col items-center justify-center">
         <DonutChart
           data={chartData}
@@ -355,13 +355,13 @@ export const TopInsightsSection: React.FC<TopInsightsSectionProps> = ({
             <TabsTrigger value="list">Insights</TabsTrigger>
             <TabsTrigger value="pie">Pie Chart</TabsTrigger>
           </TabsList>
-          <TabsContent value="list">
+          <TabsContent value="list" className="mt-4 h-[300px]">
             <InsightsList
               insights={insights}
               maxComments={analysis.maxComments}
             />
           </TabsContent>
-          <TabsContent value="pie">
+          <TabsContent value="pie" className="mt-4 h-[300px]">
             <InsightsChart insights={insights} />
           </TabsContent>
         </Tabs>
